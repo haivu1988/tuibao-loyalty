@@ -1,0 +1,23 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5cb33e"/>
+      <stop offset="1" stop-color="#306c20"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- ong hut -->
+  <rect x="300" y="110" width="28" height="160" rx="14" fill="#f2531e" transform="rotate(18 314 190)"/>
+  <!-- nap ly -->
+  <rect x="160" y="172" width="192" height="44" rx="16" fill="#f2531e"/>
+  <!-- than ly -->
+  <path d="M180 214 h152 l-20 206 a26 26 0 0 1 -26 24 h-60 a26 26 0 0 1 -26 -24 z" fill="#fffdf5"/>
+  <!-- tra sua (mau vang) -->
+  <path d="M193 322 h126 l-9 98 a26 26 0 0 1 -26 24 h-56 a26 26 0 0 1 -26 -24 z" fill="#ffd21e"/>
+  <!-- tran chau -->
+  <circle cx="224" cy="420" r="15" fill="#2e2016"/>
+  <circle cx="258" cy="432" r="15" fill="#2e2016"/>
+  <circle cx="292" cy="420" r="15" fill="#2e2016"/>
+  <circle cx="242" cy="406" r="13" fill="#2e2016"/>
+  <circle cx="276" cy="406" r="13" fill="#2e2016"/>
+</svg>

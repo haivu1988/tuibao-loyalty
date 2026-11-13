@@ -4,7 +4,6 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "TUIBAO · Trà sữa tích điểm",
   description: "Tích tick – đổi quà cho tín đồ trà sữa TUIBAO 🧋",
-  icons: { icon: "/tuibao-logo.png" },
 };
 
 export const viewport: Viewport = {
