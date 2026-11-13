@@ -1,3 +1,10 @@
+// Quy đổi tick: 20.000đ = 1 tick (phải khớp v_rate trong migration 004)
+export const TICK_RATE = 20000;
+
+export function ticksFromAmount(amount: number): number {
+  return Math.floor(Math.max(amount || 0, 0) / TICK_RATE);
+}
+
 // Định dạng tiền VND
 export function formatVND(amount: number): string {
   return new Intl.NumberFormat("vi-VN", {
