@@ -32,3 +32,6 @@ next-env.d.ts
 
 # tài liệu/ảnh tham khảo nội bộ (không cần lên repo)
 hinh tham khao/
+
+.vercel
+.env*
