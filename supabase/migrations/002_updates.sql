@@ -27,7 +27,7 @@ begin
     return jsonb_build_object('found', false);
   end if;
 
-  select coalesce(jsonb_agg(g order by g.tick_cost), '[]'::jsonb)
+  select coalesce(jsonb_agg(gj order by tc), '[]'::jsonb)
   into v_gifts
   from (
     select jsonb_build_object(
@@ -38,7 +38,7 @@ begin
       'in_stock', stock > 0,
       'reached', v_customer.ticks >= tick_cost,
       'ticks_needed', greatest(tick_cost - v_customer.ticks, 0)
-    ) as g, tick_cost
+    ) as gj, tick_cost as tc
     from public.gifts
     where active = true
   ) t;
