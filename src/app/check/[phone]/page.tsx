@@ -101,7 +101,16 @@ export default async function CheckPage({
           </>
         )}
 
-        <p className="mt-6 text-center text-xs text-slate-400">
+        <p className="mt-5 text-center">
+          <a
+            href="/check"
+            className="text-sm font-semibold text-brand-600 underline-offset-2 hover:underline"
+          >
+            ← Tra số điện thoại khác
+          </a>
+        </p>
+
+        <p className="mt-4 text-center text-xs text-slate-400">
           Thẻ thành viên điện tử · TUIBAO
         </p>
       </div>

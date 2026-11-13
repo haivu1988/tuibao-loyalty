@@ -27,6 +27,7 @@ export default async function AdminLayout({
     { href: "/admin/staff", label: "Nhân viên" },
     { href: "/admin/branches", label: "Chi nhánh" },
     { href: "/admin/gifts", label: "Quà" },
+    { href: "/admin/qr", label: "Mã QR" },
     { href: "/staff", label: "Màn NV" },
   ];
 
