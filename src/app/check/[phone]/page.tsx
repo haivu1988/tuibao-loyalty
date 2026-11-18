@@ -1,119 +1,148 @@
-import { createClient } from '@/lib/supabase/server'
-import { findNearMilestone } from '@/lib/utils'
+import { createClient } from "@/lib/supabase/server";
+import Logo from "@/components/Logo";
+import type { CustomerCheckResult } from "@/types";
 
-interface Props {
-  params: Promise<{ phone: string }>
-}
+export const dynamic = "force-dynamic";
 
-export default async function CheckPage({ params }: Props) {
-  const { phone: rawPhone } = await params
-  const phone = decodeURIComponent(rawPhone)
+export default async function CheckPage({
+  params,
+}: {
+  params: { phone: string };
+}) {
+  const supabase = createClient();
+  const { data } = await supabase.rpc("customer_check", {
+    p_phone: decodeURIComponent(params.phone),
+  });
 
-  const supabase = await createClient()
-
-  const [{ data: customer }, { data: rewards }] = await Promise.all([
-    supabase.from('customers').select('*').eq('phone', phone).single(),
-    supabase.from('rewards').select('*').eq('is_active', true).order('points_required'),
-  ])
-
-  if (!customer) {
-    return (
-      <div className="min-h-screen bg-green-700 flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-white font-black text-3xl mb-2">TUIBAO</div>
-        <div className="bg-white rounded-3xl p-6 max-w-sm w-full">
-          <div className="text-4xl mb-3">❓</div>
-          <h1 className="font-bold text-gray-900 text-lg mb-2">Chưa có tài khoản</h1>
-          <p className="text-gray-500 text-sm">
-            Số <strong>{phone}</strong> chưa tham gia chương trình tích điểm.
-          </p>
-          <p className="text-gray-400 text-xs mt-3">
-            Nhờ nhân viên quán đăng ký giúp bạn nhé!
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  const nearMilestone = findNearMilestone(customer.total_points, rewards ?? [])
-  const redeemable = (rewards ?? []).filter((r) => customer.total_points >= r.points_required)
+  const result = (data as CustomerCheckResult) || { found: false };
 
   return (
-    <div className="min-h-screen bg-green-700 flex flex-col items-center pt-10 p-4">
-      {/* Header */}
-      <div className="text-white font-black text-3xl mb-6">TUIBAO</div>
-
-      <div className="w-full max-w-sm space-y-4">
-        {/* Points card */}
-        <div className="bg-white rounded-3xl p-6 text-center shadow-xl">
-          <div className="text-gray-500 text-sm mb-1">Xin chào,</div>
-          <div className="text-gray-900 font-bold text-xl mb-1">
-            {customer.full_name ?? phone}
-          </div>
-          <div className="text-gray-400 text-sm mb-4">{phone}</div>
-
-          <div className="bg-green-50 rounded-2xl py-5 px-4">
-            <div className="text-6xl font-black text-green-700 leading-none">
-              {customer.total_points}
-            </div>
-            <div className="text-green-600 font-medium mt-1">tick tích lũy</div>
-          </div>
+    <main className="flex min-h-screen flex-col items-center px-4 py-10">
+      <div className="w-full max-w-md">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <Logo size={72} />
+          <p className="mt-2 text-sm font-semibold text-brand-700">
+            Thẻ thành viên trà sữa 🧋
+          </p>
         </div>
 
-        {/* Near milestone */}
-        {nearMilestone && (
-          <div className="bg-orange-500 text-white rounded-2xl p-4">
-            <div className="font-bold text-lg">🎯 Gần đến rồi!</div>
-            <div className="text-orange-100 text-sm mt-1">
-              Còn <strong>{nearMilestone.diff} tick</strong> nữa là đổi được{' '}
-              <strong>{nearMilestone.reward.name}</strong>!
-            </div>
-          </div>
-        )}
-
-        {/* Can redeem */}
-        {redeemable.length > 0 && (
-          <div className="bg-white rounded-2xl p-4 shadow">
-            <div className="font-bold text-gray-900 mb-3">🎁 Có thể đổi ngay</div>
-            <div className="space-y-2">
-              {redeemable.map((r) => (
-                <div key={r.id} className="flex items-center justify-between bg-green-50 rounded-xl px-3 py-2">
-                  <span className="text-sm font-medium text-green-800">{r.name}</span>
-                  <span className="text-xs text-green-600 font-bold">{r.points_required} tick</span>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-gray-400 mt-3 text-center">
-              Nhờ nhân viên quán đổi quà giúp bạn nhé!
+        {!result.found ? (
+          <div className="card text-center">
+            <p className="text-slate-700">
+              Chưa tìm thấy thành viên với số điện thoại này.
+            </p>
+            <p className="mt-2 text-sm text-slate-400">
+              Ghé quầy TUIBAO mua & tích tick để mở thẻ thành viên nhé!
             </p>
           </div>
+        ) : (
+          <>
+            {/* Thẻ tick */}
+            <div className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-brand-500 to-brand-700 p-6 text-white shadow-[0_18px_40px_-16px_rgba(48,108,32,0.6)]">
+              <div className="pointer-events-none absolute -right-6 -top-8 text-8xl opacity-20">
+                🧋
+              </div>
+              <p className="text-sm opacity-90">
+                {result.full_name || "Thành viên TUIBAO"}
+              </p>
+              <p className="text-base font-semibold tracking-wide">
+                {result.phone}
+              </p>
+              <div className="mt-5 flex items-end gap-2">
+                <span className="text-6xl font-black leading-none drop-shadow">
+                  {result.ticks ?? 0}
+                </span>
+                <span className="mb-1.5 rounded-full bg-sun-300 px-2 py-0.5 text-xs font-extrabold text-sun-900">
+                  TICK
+                </span>
+              </div>
+            </div>
+
+            {/* Mốc quà */}
+            <div className="card mt-4">
+              <h2 className="mb-3 text-sm font-black text-brand-800">
+                🎁 Quà có thể đổi &amp; mốc sắp đạt
+              </h2>
+              <ul className="space-y-2">
+                {(result.gifts ?? []).map((g) => (
+                  <li
+                    key={g.id}
+                    className={`flex items-center gap-3 rounded-2xl border-2 px-3 py-2.5 ${
+                      g.reached
+                        ? "border-brand-300 bg-brand-50"
+                        : "border-slate-100"
+                    }`}
+                  >
+                    <GiftThumb url={g.image_url} reached={g.reached} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-slate-800">
+                        {g.name}
+                      </p>
+                      <p className="text-xs text-slate-500">{g.tick_cost} tick</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      {g.reached ? (
+                        <span className="chip bg-brand-100 text-brand-700">
+                          ✓ Đủ đổi{!g.in_stock && " (hết)"}
+                        </span>
+                      ) : (
+                        <span className="chip bg-sun-100 text-sun-800">
+                          còn {g.ticks_needed}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+                {(result.gifts ?? []).length === 0 && (
+                  <li className="text-sm text-slate-400">Chưa có quà nào.</li>
+                )}
+              </ul>
+            </div>
+          </>
         )}
 
-        {/* Rewards table */}
-        <div className="bg-white rounded-2xl p-4 shadow">
-          <div className="font-bold text-gray-900 mb-3">🏆 Bảng đổi quà</div>
-          <div className="space-y-2">
-            {(rewards ?? []).map((r) => {
-              const reached = customer.total_points >= r.points_required
-              return (
-                <div key={r.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span>{reached ? '✅' : '⬜'}</span>
-                    <span className={`text-sm ${reached ? 'font-semibold text-green-800' : 'text-gray-500'}`}>
-                      {r.name}
-                    </span>
-                  </div>
-                  <span className="text-sm font-bold text-gray-700">{r.points_required} tick</span>
-                </div>
-              )
-            })}
-          </div>
-          <div className="text-xs text-center text-gray-400 mt-3">
-            Mỗi 20.000đ = 1 tick
-          </div>
-        </div>
-      </div>
+        <p className="mt-5 text-center">
+          <a
+            href="/check"
+            className="text-sm font-semibold text-brand-600 underline-offset-2 hover:underline"
+          >
+            ← Tra số điện thoại khác
+          </a>
+        </p>
 
-      <div className="text-green-300 text-xs mt-6 mb-8">TUIBAO Trà Sữa & Trà Trái Cây</div>
+        <p className="mt-4 text-center text-xs text-slate-400">
+          Thẻ thành viên điện tử · TUIBAO
+        </p>
+      </div>
+    </main>
+  );
+}
+
+/* eslint-disable-next-line @next/next/no-img-element */
+function GiftThumb({
+  url,
+  reached,
+}: {
+  url?: string | null;
+  reached: boolean;
+}) {
+  if (url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={url}
+        alt=""
+        className="h-11 w-11 shrink-0 rounded-xl object-cover ring-1 ring-black/5"
+      />
+    );
+  }
+  return (
+    <div
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ${
+        reached ? "bg-brand-100" : "bg-slate-100"
+      }`}
+    >
+      🎁
     </div>
-  )
+  );
 }

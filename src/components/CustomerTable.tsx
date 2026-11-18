@@ -1,129 +1,125 @@
-'use client'
+"use client";
 
-import { useState, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { Search, ArrowUpDown, X, Gift, Receipt } from 'lucide-react'
-import { formatVND, formatPhone, formatDate } from '@/lib/utils'
-import type { CustomerStats } from '@/types'
+import { useState, useMemo } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { formatVND, formatPhone, formatDate, formatDateTime, normalizePhone } from "@/lib/utils";
+import type { CustomerStats } from "@/types";
 
-type SortKey = 'total_spent' | 'total_points' | 'transaction_count' | 'last_transaction_at'
+type SortKey = "total_spent" | "ticks" | "transaction_count" | "last_transaction_at";
 
 const sortOptions: { key: SortKey; label: string }[] = [
-  { key: 'total_spent', label: 'Tổng tiền' },
-  { key: 'total_points', label: 'Điểm hiện có' },
-  { key: 'transaction_count', label: 'Số lần mua' },
-  { key: 'last_transaction_at', label: 'Mua gần nhất' },
-]
+  { key: "total_spent", label: "Tổng tiền" },
+  { key: "ticks", label: "Tick hiện có" },
+  { key: "transaction_count", label: "Số lần mua" },
+  { key: "last_transaction_at", label: "Mua gần nhất" },
+];
 
-interface HistoryRow {
-  id: string
-  points_used: number
-  created_at: string
-  reward: { name: string } | null
-  profile: { full_name: string } | null
+interface RedemptionRow {
+  id: string;
+  gift_name: string | null;
+  ticks_spent: number;
+  created_at: string;
+  staff: { full_name: string } | null;
 }
 
 interface TxRow {
-  id: string
-  invoice_code: string
-  amount: number
-  points_earned: number
-  created_at: string
-  profile: { full_name: string } | null
-  branch: { name: string } | null
+  id: string;
+  invoice_number: string | null;
+  amount: number;
+  ticks_earned: number;
+  created_at: string;
+  staff: { full_name: string } | null;
+  branch: { name: string } | null;
 }
 
 export default function CustomerTable({ customers }: { customers: CustomerStats[] }) {
-  const [query, setQuery] = useState('')
-  const [sortKey, setSortKey] = useState<SortKey>('total_spent')
-  const [detail, setDetail] = useState<CustomerStats | null>(null)
-  const [redemptions, setRedemptions] = useState<HistoryRow[] | null>(null)
-  const [transactions, setTransactions] = useState<TxRow[] | null>(null)
-  const [loadingDetail, setLoadingDetail] = useState(false)
+  const supabase = createClient();
+  const [query, setQuery] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("total_spent");
+  const [detail, setDetail] = useState<CustomerStats | null>(null);
+  const [reds, setReds] = useState<RedemptionRow[] | null>(null);
+  const [txs, setTxs] = useState<TxRow[] | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const q = query.trim().toLowerCase();
+    const digits = normalizePhone(query);
     const list = q
       ? customers.filter(
           (c) =>
-            c.phone.includes(q.replace(/\D/g, '')) ||
-            (c.full_name ?? '').toLowerCase().includes(q)
+            (digits && c.phone.includes(digits)) ||
+            (c.full_name ?? "").toLowerCase().includes(q)
         )
-      : customers
+      : customers;
 
     return [...list].sort((a, b) => {
-      if (sortKey === 'last_transaction_at') {
+      if (sortKey === "last_transaction_at") {
         return (
           new Date(b.last_transaction_at ?? 0).getTime() -
           new Date(a.last_transaction_at ?? 0).getTime()
-        )
+        );
       }
-      return (b[sortKey] as number) - (a[sortKey] as number)
-    })
-  }, [customers, query, sortKey])
+      return (b[sortKey] as number) - (a[sortKey] as number);
+    });
+  }, [customers, query, sortKey]);
 
   async function openDetail(c: CustomerStats) {
-    setDetail(c)
-    setRedemptions(null)
-    setTransactions(null)
-    setLoadingDetail(true)
+    setDetail(c);
+    setReds(null);
+    setTxs(null);
+    setLoading(true);
 
-    const supabase = createClient()
-    const [{ data: reds }, { data: txs }] = await Promise.all([
+    const [{ data: r }, { data: t }] = await Promise.all([
       supabase
-        .from('redemptions')
-        .select('id, points_used, created_at, reward:rewards(name), profile:profiles(full_name)')
-        .eq('customer_id', c.id)
-        .order('created_at', { ascending: false }),
+        .from("redemptions")
+        .select("id, gift_name, ticks_spent, created_at, staff:profiles(full_name)")
+        .eq("customer_id", c.id)
+        .order("created_at", { ascending: false }),
       supabase
-        .from('transactions')
-        .select('id, invoice_code, amount, points_earned, created_at, profile:profiles(full_name), branch:branches(name)')
-        .eq('customer_id', c.id)
-        .order('created_at', { ascending: false })
-        .limit(50),
-    ])
+        .from("transactions")
+        .select(
+          "id, invoice_number, amount, ticks_earned, created_at, staff:profiles(full_name), branch:branches(name)"
+        )
+        .eq("customer_id", c.id)
+        .order("created_at", { ascending: false })
+        .limit(100),
+    ]);
 
-    setRedemptions((reds ?? []) as unknown as HistoryRow[])
-    setTransactions((txs ?? []) as unknown as TxRow[])
-    setLoadingDetail(false)
+    setReds((r ?? []) as unknown as RedemptionRow[]);
+    setTxs((t ?? []) as unknown as TxRow[]);
+    setLoading(false);
   }
 
   return (
     <>
       {/* Tìm kiếm + sắp xếp */}
-      <div className="card !p-3 space-y-2.5">
+      <div className="card !p-4 space-y-3">
         <div className="relative">
-          <Search
-            size={18}
-            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-          />
           <input
-            type="text"
+            className="input pr-10"
+            placeholder="Tìm theo tên hoặc số điện thoại"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Tìm theo tên hoặc số điện thoại"
-            className="input-field pl-11 pr-10"
           />
           {query && (
             <button
-              onClick={() => setQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400"
+              onClick={() => setQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 px-2 text-slate-400"
             >
-              <X size={18} />
+              ✕
             </button>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-          <ArrowUpDown size={14} className="text-gray-400 shrink-0" />
+        <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
           {sortOptions.map((o) => (
             <button
               key={o.key}
               onClick={() => setSortKey(o.key)}
-              className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
                 sortKey === o.key
-                  ? 'bg-green-700 text-white'
-                  : 'bg-gray-100 text-gray-600'
+                  ? "bg-brand-600 text-white"
+                  : "bg-brand-50 text-brand-700"
               }`}
             >
               {o.label}
@@ -135,41 +131,41 @@ export default function CustomerTable({ customers }: { customers: CustomerStats[
       {/* Danh sách */}
       <div className="card !p-0 overflow-hidden">
         {filtered.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-10">
+          <p className="py-10 text-center text-sm text-slate-400">
             Không tìm thấy khách hàng
           </p>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-brand-50">
             {filtered.map((c) => (
               <button
                 key={c.id}
                 onClick={() => openDetail(c)}
-                className="w-full px-3.5 py-3 flex items-center gap-3 text-left active:bg-gray-50"
+                className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-brand-50/50"
               >
-                <div className="shrink-0 w-10 h-10 rounded-full bg-green-100
-                                flex items-center justify-center font-bold text-green-700">
-                  {(c.full_name ?? c.phone).charAt(0).toUpperCase()}
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center
+                                rounded-full bg-brand-100 font-black text-brand-700">
+                  {(c.full_name || c.phone).charAt(0).toUpperCase()}
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-sm truncate">
-                    {c.full_name ?? 'Chưa có tên'}
-                  </div>
-                  <div className="text-xs text-gray-500 tabular-nums">
+                  <p className="truncate text-sm font-bold text-slate-800">
+                    {c.full_name || "Chưa có tên"}
+                  </p>
+                  <p className="text-xs tabular-nums text-slate-500">
                     {formatPhone(c.phone)} · {c.transaction_count} lần mua
-                  </div>
+                  </p>
                 </div>
 
-                <div className="text-right shrink-0">
-                  <div className="font-bold text-gray-900 text-sm tabular-nums">
+                <div className="shrink-0 text-right">
+                  <p className="text-sm font-black tabular-nums text-slate-900">
                     {formatVND(c.total_spent)}
-                  </div>
-                  <div className="text-xs tabular-nums">
-                    <span className="text-green-700 font-semibold">{c.total_points} tick</span>
+                  </p>
+                  <p className="text-xs tabular-nums">
+                    <span className="font-bold text-brand-700">{c.ticks} tick</span>
                     {c.redemption_count > 0 && (
-                      <span className="text-orange-500"> · {c.redemption_count} quà</span>
+                      <span className="text-carrot-600"> · {c.redemption_count} quà</span>
                     )}
-                  </div>
+                  </p>
                 </div>
               </button>
             ))}
@@ -181,82 +177,82 @@ export default function CustomerTable({ customers }: { customers: CustomerStats[
       {detail && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in"
+            className="absolute inset-0 bg-black/45 backdrop-blur-sm animate-fade-in"
             onClick={() => setDetail(null)}
           />
 
-          <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl animate-slide-up
-                          flex flex-col max-h-[90dvh]">
+          <div className="animate-slide-up relative flex max-h-[90dvh] w-full flex-col
+                          rounded-t-[1.75rem] bg-white sm:max-w-md">
             {/* Header */}
-            <div className="shrink-0 bg-green-700 text-white rounded-t-3xl px-5 py-4 relative">
+            <div className="relative shrink-0 rounded-t-[1.75rem] bg-gradient-to-br
+                            from-brand-500 to-brand-700 px-5 py-4 text-white">
               <button
                 onClick={() => setDetail(null)}
-                className="absolute right-3 top-3 p-2 rounded-full text-green-200 active:bg-green-800"
+                className="absolute right-3 top-3 rounded-full bg-white/20 px-2.5 py-1
+                           text-xs font-semibold active:bg-white/30"
               >
-                <X size={20} />
+                Đóng
               </button>
-              <div className="text-green-200 text-sm tabular-nums">
+              <p className="text-sm tabular-nums opacity-80">
                 {formatPhone(detail.phone)}
-              </div>
-              <div className="text-lg font-bold truncate pr-10">
-                {detail.full_name ?? 'Chưa có tên'}
-              </div>
-              <div className="text-green-200 text-xs mt-1">
-                Thành viên từ {formatDate(detail.created_at).split(',')[0]}
-              </div>
+              </p>
+              <p className="truncate pr-16 text-lg font-bold">
+                {detail.full_name || "Chưa có tên"}
+              </p>
+              <p className="mt-1 text-xs opacity-70">
+                Khách từ {formatDate(detail.created_at)}
+              </p>
             </div>
 
             {/* Số liệu */}
-            <div className="shrink-0 grid grid-cols-3 gap-2 p-4 bg-gray-50 border-b border-gray-200">
+            <div className="grid shrink-0 grid-cols-3 gap-2 border-b border-brand-100 bg-brand-50/60 p-4">
               {[
-                { label: 'Tổng tiền', value: formatVND(detail.total_spent), color: 'text-gray-900' },
-                { label: 'Điểm hiện có', value: `${detail.total_points}`, color: 'text-green-700' },
-                { label: 'Đã tích', value: `${detail.total_points_earned}`, color: 'text-blue-600' },
+                { label: "Tổng tiền", value: formatVND(detail.total_spent) },
+                { label: "Tick hiện có", value: String(detail.ticks) },
+                { label: "Tick đã tích", value: String(detail.ticks_earned) },
               ].map((s) => (
-                <div key={s.label} className="bg-white rounded-xl py-2.5 text-center">
-                  <div className={`font-black text-base tabular-nums ${s.color}`}>
+                <div key={s.label} className="rounded-2xl bg-white py-2.5 text-center">
+                  <p className="text-base font-black tabular-nums text-slate-900">
                     {s.value}
-                  </div>
-                  <div className="text-[11px] text-gray-500 mt-0.5">{s.label}</div>
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">{s.label}</p>
                 </div>
               ))}
             </div>
 
-            {/* Lịch sử */}
-            <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 pb-7">
-              {loadingDetail && (
-                <p className="text-sm text-gray-400 text-center py-6">Đang tải...</p>
+            <div className="flex-1 space-y-5 overflow-y-auto overscroll-contain p-4 pb-7">
+              {loading && (
+                <p className="py-6 text-center text-sm text-slate-400">Đang tải…</p>
               )}
 
               {/* Lịch sử đổi quà */}
-              {!loadingDetail && (
+              {!loading && (
                 <div>
-                  <h3 className="flex items-center gap-1.5 font-bold text-sm text-gray-900 mb-2">
-                    <Gift size={15} className="text-orange-500" />
-                    Lịch sử đổi quà ({redemptions?.length ?? 0})
+                  <h3 className="mb-2 text-sm font-bold text-slate-900">
+                    🎁 Lịch sử đổi quà ({reds?.length ?? 0})
                   </h3>
-                  {(redemptions ?? []).length === 0 ? (
-                    <p className="text-sm text-gray-400 py-2">Chưa đổi quà lần nào</p>
+                  {(reds ?? []).length === 0 ? (
+                    <p className="py-2 text-sm text-slate-400">Chưa đổi quà lần nào</p>
                   ) : (
                     <div className="space-y-1.5">
-                      {redemptions!.map((r) => (
+                      {reds!.map((r) => (
                         <div
                           key={r.id}
-                          className="flex justify-between items-start bg-orange-50
-                                     border border-orange-200 rounded-xl px-3 py-2"
+                          className="flex items-start justify-between rounded-2xl
+                                     border-2 border-carrot-100 bg-carrot-50 px-3.5 py-2.5"
                         >
                           <div className="min-w-0">
-                            <div className="text-sm font-semibold text-orange-900 truncate">
-                              {r.reward?.name ?? 'Quà đã xóa'}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {formatDate(r.created_at)}
-                              {r.profile?.full_name && ` · NV: ${r.profile.full_name}`}
-                            </div>
+                            <p className="truncate text-sm font-bold text-carrot-900">
+                              {r.gift_name || "Quà đã xoá"}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {formatDateTime(r.created_at)}
+                              {r.staff?.full_name && ` · ${r.staff.full_name}`}
+                            </p>
                           </div>
-                          <div className="text-orange-600 font-bold text-sm shrink-0 ml-2 tabular-nums">
-                            −{r.points_used}
-                          </div>
+                          <p className="ml-2 shrink-0 text-sm font-black tabular-nums text-carrot-600">
+                            −{r.ticks_spent}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -264,36 +260,37 @@ export default function CustomerTable({ customers }: { customers: CustomerStats[
                 </div>
               )}
 
-              {/* Lịch sử tích điểm */}
-              {!loadingDetail && (
+              {/* Lịch sử mua hàng */}
+              {!loading && (
                 <div>
-                  <h3 className="flex items-center gap-1.5 font-bold text-sm text-gray-900 mb-2">
-                    <Receipt size={15} className="text-green-600" />
-                    Lịch sử mua hàng ({transactions?.length ?? 0})
+                  <h3 className="mb-2 text-sm font-bold text-slate-900">
+                    🧾 Lịch sử mua hàng ({txs?.length ?? 0})
                   </h3>
-                  {(transactions ?? []).length === 0 ? (
-                    <p className="text-sm text-gray-400 py-2">Chưa có giao dịch</p>
+                  {(txs ?? []).length === 0 ? (
+                    <p className="py-2 text-sm text-slate-400">Chưa có giao dịch</p>
                   ) : (
-                    <div className="divide-y divide-gray-100">
-                      {transactions!.map((t) => (
-                        <div key={t.id} className="flex justify-between items-start py-2">
+                    <div className="divide-y divide-brand-50">
+                      {txs!.map((t) => (
+                        <div key={t.id} className="flex items-start justify-between py-2.5">
                           <div className="min-w-0">
-                            <div className="text-sm font-medium">HĐ {t.invoice_code}</div>
-                            <div className="text-xs text-gray-500">
-                              {formatDate(t.created_at)}
-                            </div>
-                            <div className="text-xs text-gray-400">
+                            <p className="text-sm font-semibold text-slate-800">
+                              {t.invoice_number ? `HĐ ${t.invoice_number}` : "Không có mã HĐ"}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {formatDateTime(t.created_at)}
+                            </p>
+                            <p className="text-xs text-slate-400">
                               {t.branch?.name}
-                              {t.profile?.full_name && ` · ${t.profile.full_name}`}
-                            </div>
+                              {t.staff?.full_name && ` · ${t.staff.full_name}`}
+                            </p>
                           </div>
-                          <div className="text-right shrink-0 ml-2">
-                            <div className="text-green-700 font-bold text-sm tabular-nums">
-                              +{t.points_earned}
-                            </div>
-                            <div className="text-xs text-gray-400 tabular-nums">
+                          <div className="ml-2 shrink-0 text-right">
+                            <p className="text-sm font-black tabular-nums text-brand-700">
+                              +{t.ticks_earned}
+                            </p>
+                            <p className="text-xs tabular-nums text-slate-400">
                               {formatVND(t.amount)}
-                            </div>
+                            </p>
                           </div>
                         </div>
                       ))}
@@ -306,5 +303,5 @@ export default function CustomerTable({ customers }: { customers: CustomerStats[
         </div>
       )}
     </>
-  )
+  );
 }

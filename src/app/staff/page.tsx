@@ -1,92 +1,106 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { todayVN } from '@/lib/utils'
-import StaffWorkspace, { type TodayEntry } from '@/components/StaffWorkspace'
-import type { Customer, Reward } from '@/types'
+import { createClient } from "@/lib/supabase/server";
+import StaffConsole from "@/components/StaffConsole";
+import { todayVN } from "@/lib/utils";
+import type { Customer, Gift, TodayEntry } from "@/types";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 export default async function StaffPage() {
-  const supabase = await createClient()
+  const supabase = createClient();
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, branch_id')
-    .eq('id', user.id)
-    .single()
+  const { data: me } = await supabase
+    .from("profiles")
+    .select("branch_id, branch:branches(name)")
+    .eq("id", user?.id ?? "")
+    .maybeSingle();
 
-  const [{ data: rewards }, { data: todayTx }, { data: allCustomers }] =
-    await Promise.all([
-      supabase
-        .from('rewards')
-        .select('*')
-        .eq('is_active', true)
-        .order('points_required'),
+  const myBranch =
+    (me as unknown as { branch: { name: string } | null } | null)?.branch?.name ?? null;
 
-      // Giao dịch hôm nay (theo giờ VN)
-      supabase
-        .from('transactions')
-        .select('customer_id, amount, points_earned, created_at, customer:customers(*)')
-        .eq('invoice_date', todayVN())
-        .order('created_at', { ascending: false }),
+  const [{ data: gifts }, { data: todayTx }, { data: withTicks }] = await Promise.all([
+    supabase
+      .from("gifts")
+      .select("*")
+      .eq("active", true)
+      .order("tick_cost", { ascending: true }),
 
-      // Khách có điểm, để tính nhắc Zalo
-      supabase
-        .from('customers')
-        .select('*')
-        .gt('total_points', 0)
-        .order('total_points', { ascending: false })
-        .limit(200),
-    ])
+    // Giao dịch hôm nay (theo giờ VN)
+    supabase
+      .from("transactions")
+      .select("customer_id, amount, ticks_earned, created_at, customer:customers(*)")
+      .eq("invoice_date", todayVN())
+      .order("created_at", { ascending: false }),
 
-  const rewardList = (rewards ?? []) as Reward[]
+    // Khách đã có tick — để tính nhắc Zalo
+    supabase
+      .from("customers")
+      .select("*")
+      .gt("ticks", 0)
+      .order("ticks", { ascending: false })
+      .limit(300),
+  ]);
+
+  const giftList = (gifts as Gift[]) ?? [];
 
   // ── Gom giao dịch hôm nay theo khách ──
-  const map = new Map<string, TodayEntry>()
+  const map = new Map<string, TodayEntry>();
   for (const tx of todayTx ?? []) {
-    // @ts-expect-error supabase join
-    const c = tx.customer as Customer | null
-    if (!c) continue
-    const existing = map.get(c.id)
+    const c = (tx as unknown as { customer: Customer | null }).customer;
+    if (!c) continue;
+    const existing = map.get(c.id);
     if (existing) {
-      existing.txCount += 1
+      existing.txCount += 1;
     } else {
       map.set(c.id, {
         customer: c,
         lastAmount: tx.amount,
-        lastPoints: tx.points_earned,
+        lastTicks: tx.ticks_earned,
         lastTime: tx.created_at,
         txCount: 1,
-      })
+      });
     }
   }
-  const todayList = Array.from(map.values())
+  const todayList = Array.from(map.values());
 
-  // ── Khách gần đủ điểm (thiếu 1-2 tick) ──
-  const sortedRewards = [...rewardList].sort(
-    (a, b) => a.points_required - b.points_required
-  )
-  const zaloAlerts = (allCustomers ?? [])
+  // ── Khách gần đủ tick (thiếu 1-2) ──
+  const sorted = [...giftList].sort((a, b) => a.tick_cost - b.tick_cost);
+  const zaloAlerts = ((withTicks as Customer[]) ?? [])
     .map((c) => {
-      const next = sortedRewards.find((r) => r.points_required > c.total_points)
-      if (!next) return null
-      const diff = next.points_required - c.total_points
-      if (diff > 2) return null
-      return { customer: c as Customer, diff, rewardName: next.name }
+      const next = sorted.find((g) => g.tick_cost > c.ticks);
+      if (!next) return null;
+      const diff = next.tick_cost - c.ticks;
+      if (diff > 2) return null;
+      return { customer: c, diff, giftName: next.name };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null)
-    .slice(0, 10)
+    .slice(0, 10);
 
   return (
-    <StaffWorkspace
-      staffId={profile?.id ?? user.id}
-      branchId={profile?.branch_id ?? ''}
-      rewards={rewardList}
-      todayList={todayList}
-      zaloAlerts={zaloAlerts}
-    />
-  )
+    <div>
+      <div className="mb-4">
+        <h1 className="text-xl font-bold text-slate-900">Tích tick & đổi quà</h1>
+        {myBranch ? (
+          <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-50
+                        px-3 py-1 text-xs font-bold text-brand-700">
+            📍 {myBranch}
+          </p>
+        ) : (
+          <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-amber-50
+                        px-3 py-1 text-xs font-bold text-amber-800">
+            📍 Chưa gán chi nhánh
+          </p>
+        )}
+      </div>
+
+      <StaffConsole
+        gifts={giftList}
+        todayList={todayList}
+        zaloAlerts={zaloAlerts}
+      />
+    </div>
+  );
 }

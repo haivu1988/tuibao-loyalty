@@ -1,67 +1,98 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { NextResponse } from "next/server";
+import { createClient as createServerSupabase } from "@/lib/supabase/server";
+import { createClient as createAdminSupabase } from "@supabase/supabase-js";
+import { loginIdToEmail } from "@/lib/utils";
 
-// POST: Tạo tài khoản nhân viên mới (chỉ admin)
-export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 })
-
-  const { data: profile } = await supabase
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') {
-    return NextResponse.json({ error: 'Không có quyền' }, { status: 403 })
+// POST /api/staff — Tạo tài khoản nhân viên mới (chỉ quản lý được gọi)
+export async function POST(request: Request) {
+  // 1) Xác thực người gọi phải là admin
+  const supabase = createServerSupabase();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Chưa đăng nhập" }, { status: 401 });
   }
 
-  const { email, password, full_name, branch_id, role } = await req.json()
+  const { data: me } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (me?.role !== "admin") {
+    return NextResponse.json({ error: "Không có quyền" }, { status: 403 });
+  }
 
-  const adminClient = createAdminClient()
+  // 2) Đọc payload
+  const body = await request.json().catch(() => null);
+  const loginId = (body?.login_id || body?.email || "").trim();
+  const email = loginIdToEmail(loginId); // ID -> email nội bộ (hoặc giữ nguyên nếu là email)
+  const password = body?.password || "";
+  const fullName = (body?.full_name || "").trim();
+  const role = body?.role === "admin" ? "admin" : "staff";
+  const branchId = body?.branch_id || null;
 
-  // Tạo auth user với service role
-  const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+  if (!loginId || !password || !fullName) {
+    return NextResponse.json(
+      { error: "Thiếu ID đăng nhập, mật khẩu hoặc tên" },
+      { status: 400 }
+    );
+  }
+  if (!/^[a-z0-9._-]+$/i.test(loginId) && !loginId.includes("@")) {
+    return NextResponse.json(
+      { error: "ID chỉ gồm chữ, số và . _ - (không dấu, không khoảng trắng)" },
+      { status: 400 }
+    );
+  }
+  if (password.length < 6) {
+    return NextResponse.json(
+      { error: "Mật khẩu tối thiểu 6 ký tự" },
+      { status: 400 }
+    );
+  }
+
+  // 3) Dùng service role để tạo user (KHÔNG bao giờ lộ key này ra client)
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceKey) {
+    return NextResponse.json(
+      { error: "Thiếu SUPABASE_SERVICE_ROLE_KEY trên server" },
+      { status: 500 }
+    );
+  }
+
+  const admin = createAdminSupabase(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serviceKey,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    user_metadata: { full_name, role: role ?? 'staff' },
-  })
+    user_metadata: { full_name: fullName, role, branch_id: branchId },
+  });
 
-  if (authError) {
-    return NextResponse.json({ error: authError.message }, { status: 400 })
+  if (createErr) {
+    return NextResponse.json(
+      { error: createErr.message || "Tạo tài khoản thất bại" },
+      { status: 400 }
+    );
   }
 
-  // Cập nhật branch_id và role trong profiles
-  const { data: newProfile, error: profileError } = await supabase
-    .from('profiles')
-    .update({ branch_id: branch_id ?? null, role: role ?? 'staff' })
-    .eq('id', authData.user.id)
-    .select('*, branch:branches(name)')
-    .single()
-
-  if (profileError) {
-    return NextResponse.json({ error: profileError.message }, { status: 500 })
+  // Trigger handle_new_user sẽ tự tạo profile. Đảm bảo giá trị đúng (phòng khi trigger chưa chạy).
+  if (created.user) {
+    await admin.from("profiles").upsert(
+      {
+        id: created.user.id,
+        full_name: fullName,
+        role,
+        branch_id: branchId,
+        active: true,
+      },
+      { onConflict: "id" }
+    );
   }
 
-  return NextResponse.json({ profile: newProfile })
-}
-
-// PATCH: Bật/tắt tài khoản nhân viên
-export async function PATCH(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 })
-
-  const { data: profile } = await supabase
-    .from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'admin') {
-    return NextResponse.json({ error: 'Không có quyền' }, { status: 403 })
-  }
-
-  const { id, is_active } = await req.json()
-  const { error } = await supabase
-    .from('profiles')
-    .update({ is_active })
-    .eq('id', id)
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, id: created.user?.id });
 }

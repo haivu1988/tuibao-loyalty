@@ -1,295 +1,304 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { X, Gift, Receipt, Check, AlertCircle } from 'lucide-react'
-import { calcPoints, formatPhone, formatVND, findNearMilestone } from '@/lib/utils'
-import { useKeyboardOpen } from '@/lib/useKeyboard'
-import AmountInput, { QuickAmounts } from './AmountInput'
-import type { SuccessData } from './SuccessModal'
-import type { Customer, Reward } from '@/types'
+import { useState, useEffect, useRef } from "react";
+import { createClient } from "@/lib/supabase/client";
+import {
+  ticksFromAmount,
+  formatPhone,
+  formatVND,
+  findNearGift,
+  TICK_RATE,
+  formatThousands,
+} from "@/lib/utils";
+import { useKeyboardOpen } from "@/lib/useKeyboard";
+import AmountInput, { QuickAmounts } from "./AmountInput";
+import type { SuccessData } from "./SuccessModal";
+import type { Customer, Gift } from "@/types";
 
 interface Props {
-  customer: Customer
-  isNew: boolean
-  rewards: Reward[]
-  staffId: string
-  branchId: string
-  startOnRedeem?: boolean
-  onClose: () => void
-  onSuccess: (data: SuccessData) => void
+  customer: Customer;
+  gifts: Gift[];
+  startOnRedeem?: boolean;
+  onClose: () => void;
+  onSuccess: (data: SuccessData) => void;
 }
 
-type Tab = 'earn' | 'redeem'
+type Tab = "earn" | "redeem";
 
 export default function CustomerSheet({
   customer: initialCustomer,
-  isNew,
-  rewards,
-  staffId,
-  branchId,
+  gifts,
   startOnRedeem,
   onClose,
   onSuccess,
 }: Props) {
-  const keyboardOpen = useKeyboardOpen()
-  const nameRef = useRef<HTMLInputElement>(null)
-  const invoiceRef = useRef<HTMLInputElement>(null)
+  const supabase = createClient();
+  const keyboardOpen = useKeyboardOpen();
+  const nameRef = useRef<HTMLInputElement>(null);
+  const invoiceRef = useRef<HTMLInputElement>(null);
 
-  const [customer, setCustomer] = useState(initialCustomer)
-  const [needName, setNeedName] = useState(isNew || !initialCustomer.full_name)
-  const [name, setName] = useState('')
-  const [savingName, setSavingName] = useState(false)
+  const [customer, setCustomer] = useState(initialCustomer);
+  const [needName, setNeedName] = useState(!initialCustomer.full_name);
+  const [name, setName] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
-  const [tab, setTab] = useState<Tab>(startOnRedeem ? 'redeem' : 'earn')
-  const [invoiceCode, setInvoiceCode] = useState('')
-  const [amount, setAmount] = useState(0)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [redeemingId, setRedeemingId] = useState<string | null>(null)
-  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [tab, setTab] = useState<Tab>(startOnRedeem ? "redeem" : "earn");
+  const [invoice, setInvoice] = useState("");
+  const [amount, setAmount] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [redeemingId, setRedeemingId] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [redeemOk, setRedeemOk] = useState<string | null>(null);
 
-  const points = calcPoints(amount)
-  const nearMilestone = findNearMilestone(customer.total_points, rewards)
-  const redeemable = rewards.filter(
-    (r) => r.is_active && r.stock_quantity > 0 && customer.total_points >= r.points_required
-  )
+  const ticks = ticksFromAmount(amount);
+  const near = findNearGift(customer.ticks, gifts);
+  const activeGifts = gifts.filter((g) => g.active);
+  const redeemable = activeGifts.filter(
+    (g) => g.stock > 0 && customer.ticks >= g.tick_cost
+  );
 
-  // Tự focus đúng ô cần nhập
+  // Tự đưa con trỏ vào ô cần nhập
   useEffect(() => {
     const t = setTimeout(() => {
-      if (needName) nameRef.current?.focus()
-      else if (tab === 'earn') invoiceRef.current?.focus()
-    }, 350)
-    return () => clearTimeout(t)
-  }, [needName, tab])
+      if (needName) nameRef.current?.focus();
+      else if (tab === "earn") invoiceRef.current?.focus();
+    }, 350);
+    return () => clearTimeout(t);
+  }, [needName, tab]);
 
   /** Lưu tên khách mới */
   async function saveName(e: React.FormEvent) {
-    e.preventDefault()
+    e.preventDefault();
     if (!name.trim()) {
-      setError('Hãy nhập tên khách')
-      return
+      setError("Hãy nhập tên khách");
+      return;
     }
-    setSavingName(true)
-    setError('')
-    const supabase = createClient()
-    const { data, error: err } = await supabase
-      .from('customers')
-      .update({ full_name: name.trim() })
-      .eq('id', customer.id)
-      .select()
-      .single()
+    setSavingName(true);
+    setError(null);
 
-    setSavingName(false)
-    if (err || !data) {
-      setError('Lỗi lưu tên: ' + (err?.message ?? ''))
-      return
+    const { data, error: err } = await supabase.rpc("set_customer_name", {
+      p_customer_id: customer.id,
+      p_full_name: name.trim(),
+    });
+
+    setSavingName(false);
+    if (err) {
+      setError(err.message || "Không lưu được tên");
+      return;
     }
-    setCustomer(data)
-    setNeedName(false)
+    setCustomer(data as Customer);
+    setNeedName(false);
   }
 
-  /** Tích điểm */
+  /** Tích tick */
   async function handleEarn(e: React.FormEvent) {
-    e.preventDefault()
-    if (!branchId) {
-      setError('Tài khoản chưa được gán chi nhánh. Liên hệ quản lý.')
-      return
+    e.preventDefault();
+    if (amount <= 0) {
+      setError("Chưa nhập số tiền hoá đơn");
+      return;
     }
-    if (!invoiceCode.trim()) {
-      setError('Chưa nhập mã hóa đơn')
-      return
-    }
-    if (points < 1) {
-      setError('Số tiền chưa đủ 20.000đ để tích 1 tick')
-      return
+    if (ticks < 1) {
+      setError(`Số tiền chưa đủ ${formatThousands(TICK_RATE)}đ để tích 1 tick`);
+      return;
     }
 
-    setSaving(true)
-    setError('')
-    const supabase = createClient()
-    const { data, error: rpcError } = await supabase.rpc('add_transaction', {
-      p_invoice_code: invoiceCode.trim().toUpperCase(),
+    setSaving(true);
+    setError(null);
+
+    const { data, error: err } = await supabase.rpc("earn_ticks", {
       p_customer_id: customer.id,
+      p_invoice_number: invoice.trim() || null,
       p_amount: amount,
-      p_staff_id: staffId,
-      p_branch_id: branchId,
-    })
+      p_ticks: ticks,
+    });
 
-    setSaving(false)
+    setSaving(false);
 
-    if (rpcError) {
-      if (
-        rpcError.message.includes('uq_invoice_branch_date') ||
-        rpcError.message.includes('duplicate') ||
-        rpcError.message.includes('unique')
-      ) {
-        setError('Hóa đơn này đã được tích điểm hôm nay rồi!')
+    if (err) {
+      const msg = err.message || "";
+      if (msg.includes("uq_invoice_branch_date") || msg.includes("duplicate")) {
+        setError("Hoá đơn này đã được tích tick hôm nay rồi!");
       } else {
-        setError('Lỗi: ' + rpcError.message)
+        setError(msg || "Tích tick thất bại");
       }
-      return
+      return;
     }
 
-    const newTotal = customer.total_points + points
-    const unlocked = rewards.filter(
-      (r) =>
-        r.is_active &&
-        r.stock_quantity > 0 &&
-        newTotal >= r.points_required &&
-        customer.total_points < r.points_required
-    )
-    const next = rewards
-      .filter((r) => r.is_active && r.points_required > newTotal)
-      .sort((a, b) => a.points_required - b.points_required)[0]
+    const updated = data as Customer;
+    const newTicks = updated.ticks;
+
+    const unlocked = activeGifts.filter(
+      (g) =>
+        g.stock > 0 &&
+        newTicks >= g.tick_cost &&
+        customer.ticks < g.tick_cost
+    );
+    const next = activeGifts
+      .filter((g) => g.tick_cost > newTicks)
+      .sort((a, b) => a.tick_cost - b.tick_cost)[0];
+
+    // Lấy id giao dịch vừa tạo để có thể huỷ trong 5 phút
+    const { data: lastTx } = await supabase
+      .from("transactions")
+      .select("id")
+      .eq("customer_id", customer.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
     onSuccess({
-      transactionId: (data as { id: string })?.id ?? '',
-      customerName: customer.full_name ?? 'Khách',
+      transactionId: (lastTx as { id: string } | null)?.id ?? null,
+      customerName: customer.full_name || "Khách",
       customerPhone: customer.phone,
-      invoiceCode: invoiceCode.trim().toUpperCase(),
+      invoiceNumber: invoice.trim() || null,
       amount,
-      pointsEarned: points,
-      newTotal,
-      unlockedRewards: unlocked,
-      nextMilestone: next
-        ? { name: next.name, diff: next.points_required - newTotal }
-        : null,
-    })
+      ticksEarned: newTicks - customer.ticks,
+      newTicks,
+      unlockedGifts: unlocked,
+      nextGift: next ? { name: next.name, diff: next.tick_cost - newTicks } : null,
+    });
   }
 
   /** Đổi quà */
-  async function handleRedeem(reward: Reward) {
-    setRedeemingId(reward.id)
-    setError('')
-    const supabase = createClient()
-    const { error: rpcError } = await supabase.rpc('redeem_reward', {
+  async function handleRedeem(gift: Gift) {
+    setRedeemingId(gift.id);
+    setError(null);
+    setRedeemOk(null);
+
+    const { data, error: err } = await supabase.rpc("redeem_gift", {
       p_customer_id: customer.id,
-      p_reward_id: reward.id,
-      p_staff_id: staffId,
-      p_branch_id: branchId,
-    })
+      p_gift_id: gift.id,
+    });
 
-    setRedeemingId(null)
-    setConfirmId(null)
+    setRedeemingId(null);
+    setConfirmId(null);
 
-    if (rpcError) {
-      setError('Lỗi đổi quà: ' + rpcError.message)
-      return
+    if (err) {
+      setError(err.message || "Đổi quà thất bại");
+      return;
     }
 
-    setCustomer({
-      ...customer,
-      total_points: customer.total_points - reward.points_required,
-    })
-    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(60)
+    setCustomer(data as Customer);
+    setRedeemOk(`Đã đổi "${gift.name}" (−${gift.tick_cost} tick)`);
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(60);
   }
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/45 backdrop-blur-sm animate-fade-in"
+        onClick={onClose}
+      />
 
-      <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl animate-slide-up
-                      flex flex-col max-h-[92dvh]">
-        {/* ── Đầu sheet: thông tin khách ── */}
-        <div className="shrink-0 bg-green-700 text-white rounded-t-3xl px-5 pt-4 pb-4 relative">
+      <div className="animate-slide-up relative flex max-h-[92dvh] w-full flex-col
+                      rounded-t-[1.75rem] bg-white sm:max-w-md">
+        {/* ── Đầu sheet ── */}
+        <div className="relative shrink-0 rounded-t-[1.75rem] bg-gradient-to-br
+                        from-brand-500 to-brand-700 px-5 pb-4 pt-4 text-white">
           <button
             onClick={onClose}
-            className="absolute right-3 top-3 p-2 rounded-full text-green-200 active:bg-green-800"
-            aria-label="Đóng"
+            className="absolute right-3 top-3 rounded-full bg-white/20 px-2.5 py-1
+                       text-xs font-semibold active:bg-white/30"
           >
-            <X size={20} />
+            Đóng
           </button>
 
-          <div className="text-green-200 text-sm tabular-nums">
+          <p className="text-sm tabular-nums opacity-80">
             {formatPhone(customer.phone)}
-          </div>
-          <div className="text-lg font-bold truncate pr-10">
-            {customer.full_name ?? 'Khách mới'}
-          </div>
+          </p>
+          <p className="truncate pr-16 text-lg font-bold">
+            {customer.full_name || "Khách mới"}
+          </p>
 
-          {/* Điểm — thu gọn khi bàn phím mở */}
-          <div
-            className={`flex items-baseline gap-2 transition-all duration-200 ${
-              keyboardOpen ? 'mt-1' : 'mt-2'
-            }`}
-          >
-            <span className={`font-black tabular-nums transition-all ${
-              keyboardOpen ? 'text-3xl' : 'text-5xl'
-            }`}>
-              {customer.total_points}
+          <div className={`flex items-end gap-2 transition-all ${keyboardOpen ? "mt-1" : "mt-3"}`}>
+            <span
+              className={`font-black leading-none tabular-nums transition-all ${
+                keyboardOpen ? "text-3xl" : "text-5xl"
+              }`}
+            >
+              {customer.ticks}
             </span>
-            <span className="text-green-200 text-sm">tick</span>
+            <span className="mb-1 text-sm opacity-80">tick hiện có</span>
           </div>
 
-          {!keyboardOpen && nearMilestone && (
-            <div className="mt-2 inline-flex items-center gap-1.5 bg-green-800/60
-                            rounded-full px-3 py-1 text-xs">
-              🎯 Còn {nearMilestone.diff} tick → {nearMilestone.reward.name}
-            </div>
+          {!keyboardOpen && near && (
+            <p className="mt-2 inline-flex rounded-full bg-white/20 px-3 py-1 text-xs">
+              🎯 Còn {near.diff} tick → {near.gift.name}
+            </p>
           )}
         </div>
 
-        {/* ── Bước 1: Hỏi tên nếu chưa có ── */}
+        {/* ── Hỏi tên nếu khách chưa có ── */}
         {needName ? (
-          <form onSubmit={saveName} className="p-5 space-y-3">
-            <div className="flex items-start gap-2 bg-blue-50 border border-blue-200
-                            rounded-xl p-3 text-sm text-blue-800">
-              <AlertCircle size={18} className="shrink-0 mt-0.5" />
-              <span>Khách chưa có tên trong hệ thống. Hỏi tên khách để nhập.</span>
-            </div>
+          <form onSubmit={saveName} className="space-y-3 p-5">
+            <p className="rounded-2xl bg-sun-50 px-3.5 py-2.5 text-sm text-sun-900">
+              Khách chưa có tên trong hệ thống. Hỏi tên khách để nhập.
+            </p>
 
             <div>
-              <label className="label">Tên khách hàng</label>
+              <label className="label" htmlFor="cname">
+                Tên khách hàng
+              </label>
               <input
                 ref={nameRef}
-                type="text"
-                value={name}
-                onChange={(e) => { setName(e.target.value); setError('') }}
-                className="input-field text-lg"
+                id="cname"
+                className="input text-lg"
                 placeholder="Nguyễn Văn A"
                 autoComplete="off"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setError(null);
+                }}
               />
             </div>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && (
+              <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600">
+                {error}
+              </p>
+            )}
 
-            <button type="submit" className="btn-primary" disabled={savingName}>
-              {savingName ? 'Đang lưu...' : 'Lưu tên và tiếp tục'}
+            <button type="submit" className="btn-primary w-full" disabled={savingName}>
+              {savingName ? "Đang lưu…" : "Lưu tên và tiếp tục"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setNeedName(false)}
+              className="btn-ghost w-full text-sm"
+            >
+              Bỏ qua, tích tick luôn
             </button>
           </form>
         ) : (
           <>
             {/* ── Tab ── */}
-            <div className="shrink-0 flex border-b border-gray-200 px-2 pt-1">
+            <div className="flex shrink-0 gap-1 border-b border-brand-100 px-3 pt-2">
               <button
-                onClick={() => setTab('earn')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-bold
-                            border-b-2 transition-colors ${
-                  tab === 'earn'
-                    ? 'border-green-700 text-green-700'
-                    : 'border-transparent text-gray-400'
+                onClick={() => setTab("earn")}
+                className={`flex-1 border-b-2 pb-2.5 pt-1 text-sm font-bold transition ${
+                  tab === "earn"
+                    ? "border-brand-600 text-brand-700"
+                    : "border-transparent text-slate-400"
                 }`}
               >
-                <Receipt size={16} />
-                Tích điểm
+                Tích tick
               </button>
               <button
-                onClick={() => setTab('redeem')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-bold
-                            border-b-2 transition-colors relative ${
-                  tab === 'redeem'
-                    ? 'border-orange-500 text-orange-600'
-                    : 'border-transparent text-gray-400'
+                onClick={() => setTab("redeem")}
+                className={`relative flex-1 border-b-2 pb-2.5 pt-1 text-sm font-bold transition ${
+                  tab === "redeem"
+                    ? "border-carrot-500 text-carrot-600"
+                    : "border-transparent text-slate-400"
                 }`}
               >
-                <Gift size={16} />
                 Đổi quà
                 {redeemable.length > 0 && (
-                  <span className="absolute top-2 right-1/4 w-5 h-5 rounded-full
-                                   bg-orange-500 text-white text-[10px] font-bold
-                                   flex items-center justify-center">
+                  <span className="ml-1.5 inline-flex h-5 min-w-[1.25rem] items-center
+                                   justify-center rounded-full bg-carrot-500 px-1
+                                   text-[11px] font-bold text-white">
                     {redeemable.length}
                   </span>
                 )}
@@ -297,173 +306,196 @@ export default function CustomerSheet({
             </div>
 
             <div className="flex-1 overflow-y-auto overscroll-contain p-5 pb-7">
-              {/* ── Tab tích điểm ── */}
-              {tab === 'earn' && (
+              {/* ── Tích tick ── */}
+              {tab === "earn" && (
                 <form onSubmit={handleEarn} className="space-y-4">
                   <div>
-                    <label className="label">Mã số hóa đơn</label>
+                    <label className="label" htmlFor="invoice">
+                      Số hoá đơn{" "}
+                      <span className="font-normal text-slate-400">(tuỳ chọn)</span>
+                    </label>
                     <input
                       ref={invoiceRef}
-                      type="text"
-                      value={invoiceCode}
-                      onChange={(e) => {
-                        setInvoiceCode(e.target.value.toUpperCase())
-                        setError('')
-                      }}
-                      className="input-field uppercase text-lg font-semibold tracking-wide"
-                      placeholder="HD001234"
+                      id="invoice"
+                      className="input text-lg font-semibold tracking-wide"
+                      placeholder="HD-00123"
                       autoComplete="off"
                       disabled={saving}
+                      value={invoice}
+                      onChange={(e) => {
+                        setInvoice(e.target.value.toUpperCase());
+                        setError(null);
+                      }}
                     />
                   </div>
 
                   <div>
-                    <label className="label">Số tiền hóa đơn</label>
+                    <label className="label" htmlFor="amount">
+                      Số tiền hoá đơn
+                    </label>
                     <AmountInput
+                      id="amount"
                       value={amount}
-                      onChange={(v) => { setAmount(v); setError('') }}
+                      onChange={(v) => {
+                        setAmount(v);
+                        setError(null);
+                      }}
                       disabled={saving}
                     />
                     <div className="mt-2">
-                      <QuickAmounts onPick={(v) => setAmount(v)} disabled={saving} />
+                      <QuickAmounts onPick={setAmount} disabled={saving} />
                     </div>
                   </div>
 
-                  {/* Xem trước số tick */}
+                  {/* Xem trước */}
                   <div
-                    className={`rounded-2xl py-3 text-center border transition-colors ${
-                      points > 0
-                        ? 'bg-green-50 border-green-300'
-                        : 'bg-gray-50 border-gray-200'
+                    className={`rounded-[1.5rem] border-2 py-3 text-center transition ${
+                      ticks > 0
+                        ? "border-brand-200 bg-brand-50"
+                        : "border-slate-100 bg-slate-50"
                     }`}
                   >
-                    {points > 0 ? (
+                    {ticks > 0 ? (
                       <>
-                        <div className="text-3xl font-black text-green-700 tabular-nums">
-                          +{points} tick
+                        <div className="text-3xl font-black tabular-nums text-brand-700">
+                          +{ticks} tick
                         </div>
-                        <div className="text-xs text-gray-500 mt-0.5 tabular-nums">
-                          {formatVND(amount)} → tổng {customer.total_points + points} tick
+                        <div className="mt-0.5 text-xs tabular-nums text-slate-500">
+                          {formatVND(amount)} → tổng {customer.ticks + ticks} tick
                         </div>
                       </>
                     ) : (
-                      <div className="text-sm text-gray-400 py-1">
-                        Mỗi 20.000đ = 1 tick
-                      </div>
+                      <p className="py-1 text-sm text-slate-400">
+                        Mỗi {formatThousands(TICK_RATE)}đ = 1 tick
+                      </p>
                     )}
                   </div>
 
                   {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-700
-                                    rounded-xl px-4 py-3 text-sm flex items-start gap-2">
-                      <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                    <p className="rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-600">
                       {error}
-                    </div>
+                    </p>
                   )}
 
                   <button
                     type="submit"
-                    className="btn-primary py-4 text-lg"
-                    disabled={saving || points < 1 || !invoiceCode.trim()}
+                    className="btn-primary w-full py-3.5 text-base"
+                    disabled={saving || ticks < 1}
                   >
-                    {saving ? 'Đang lưu...' : `Tích ${points > 0 ? points : ''} tick`}
+                    {saving ? "Đang lưu…" : `Tích ${ticks > 0 ? ticks : ""} tick`}
                   </button>
                 </form>
               )}
 
-              {/* ── Tab đổi quà ── */}
-              {tab === 'redeem' && (
+              {/* ── Đổi quà ── */}
+              {tab === "redeem" && (
                 <div className="space-y-3">
                   {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-700
-                                    rounded-xl px-4 py-3 text-sm">
+                    <p className="rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-600">
                       {error}
-                    </div>
+                    </p>
+                  )}
+                  {redeemOk && (
+                    <p className="rounded-xl bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-700">
+                      {redeemOk}
+                    </p>
                   )}
 
-                  {rewards.filter((r) => r.is_active).map((r) => {
-                    const canRedeem = customer.total_points >= r.points_required
-                    const outOfStock = r.stock_quantity <= 0
-                    const isConfirming = confirmId === r.id
+                  {activeGifts.length === 0 && (
+                    <p className="py-4 text-center text-sm text-slate-400">
+                      Chưa có quà nào
+                    </p>
+                  )}
+
+                  {activeGifts.map((g) => {
+                    const enough = customer.ticks >= g.tick_cost;
+                    const inStock = g.stock > 0;
+                    const can = enough && inStock;
+                    const confirming = confirmId === g.id;
 
                     return (
                       <div
-                        key={r.id}
-                        className={`rounded-2xl border p-3.5 transition-colors ${
-                          canRedeem && !outOfStock
-                            ? 'bg-orange-50 border-orange-300'
-                            : 'bg-gray-50 border-gray-200'
+                        key={g.id}
+                        className={`rounded-[1.5rem] border-2 p-3.5 transition ${
+                          can
+                            ? "border-carrot-200 bg-carrot-50"
+                            : "border-slate-100 bg-slate-50"
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className={`font-bold text-sm ${
-                              canRedeem && !outOfStock ? 'text-orange-900' : 'text-gray-500'
-                            }`}>
-                              {canRedeem && !outOfStock ? '🎁' : '🔒'} {r.name}
+                        <div className="flex items-center gap-3">
+                          {g.image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={g.image_url}
+                              alt=""
+                              className="h-12 w-12 shrink-0 rounded-xl object-cover ring-1 ring-black/5"
+                            />
+                          ) : (
+                            <div className="flex h-12 w-12 shrink-0 items-center
+                                            justify-center rounded-xl bg-white text-xl">
+                              {can ? "🎁" : "🔒"}
                             </div>
-                            <div className="text-xs text-gray-500 mt-0.5 tabular-nums">
-                              {r.points_required} tick
-                              {outOfStock
-                                ? ' · Hết hàng'
-                                : ` · còn ${r.stock_quantity}`}
-                              {!canRedeem && !outOfStock &&
-                                ` · thiếu ${r.points_required - customer.total_points}`}
-                            </div>
+                          )}
+
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={`truncate text-sm font-bold ${
+                                can ? "text-carrot-900" : "text-slate-500"
+                              }`}
+                            >
+                              {g.name}
+                            </p>
+                            <p className="text-xs tabular-nums text-slate-500">
+                              {g.tick_cost} tick
+                              {inStock ? ` · còn ${g.stock}` : " · hết hàng"}
+                              {!enough && inStock && (
+                                <span className="text-amber-600">
+                                  {" "}· thiếu {g.tick_cost - customer.ticks}
+                                </span>
+                              )}
+                            </p>
                           </div>
 
-                          {canRedeem && !outOfStock && !isConfirming && (
+                          {can && !confirming && (
                             <button
-                              onClick={() => setConfirmId(r.id)}
-                              className="shrink-0 bg-orange-500 text-white px-4 py-2
-                                         rounded-xl font-bold text-sm active:bg-orange-600"
+                              onClick={() => setConfirmId(g.id)}
+                              className="btn-accent shrink-0 px-5"
                             >
                               Đổi
                             </button>
                           )}
                         </div>
 
-                        {/* Xác nhận 2 bước */}
-                        {isConfirming && (
-                          <div className="mt-3 pt-3 border-t border-orange-200">
-                            <p className="text-sm text-orange-900 mb-2.5">
-                              Xác nhận đổi <strong>{r.name}</strong>?
-                              Trừ {r.points_required} tick, còn lại{' '}
-                              <strong className="tabular-nums">
-                                {customer.total_points - r.points_required} tick
-                              </strong>
+                        {confirming && (
+                          <div className="mt-3 border-t border-carrot-200 pt-3">
+                            <p className="mb-2.5 text-sm text-carrot-900">
+                              Xác nhận đổi <b>{g.name}</b>? Trừ {g.tick_cost} tick,
+                              còn lại{" "}
+                              <b className="tabular-nums">
+                                {customer.ticks - g.tick_cost} tick
+                              </b>
                               .
                             </p>
                             <div className="flex gap-2">
                               <button
                                 onClick={() => setConfirmId(null)}
-                                className="flex-1 bg-white border border-gray-300 text-gray-600
-                                           py-2.5 rounded-xl font-semibold text-sm"
+                                className="btn-secondary flex-1"
                               >
-                                Hủy
+                                Huỷ
                               </button>
                               <button
-                                onClick={() => handleRedeem(r)}
-                                disabled={redeemingId === r.id}
-                                className="flex-1 bg-orange-500 text-white py-2.5 rounded-xl
-                                           font-bold text-sm active:bg-orange-600
-                                           disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                onClick={() => handleRedeem(g)}
+                                disabled={redeemingId === g.id}
+                                className="btn-accent flex-1"
                               >
-                                <Check size={16} />
-                                {redeemingId === r.id ? 'Đang đổi...' : 'Xác nhận'}
+                                {redeemingId === g.id ? "Đang đổi…" : "Xác nhận"}
                               </button>
                             </div>
                           </div>
                         )}
                       </div>
-                    )
+                    );
                   })}
-
-                  {redeemable.length === 0 && (
-                    <p className="text-center text-sm text-gray-400 py-3">
-                      Khách chưa đủ điểm đổi quà nào
-                    </p>
-                  )}
                 </div>
               )}
             </div>
@@ -471,5 +503,5 @@ export default function CustomerSheet({
         )}
       </div>
     </div>
-  )
+  );
 }

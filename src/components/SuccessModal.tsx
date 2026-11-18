@@ -1,158 +1,156 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { Check, Gift, X, Undo2 } from 'lucide-react'
-import { formatVND } from '@/lib/utils'
-import type { Reward } from '@/types'
+import { useEffect, useState } from "react";
+import { formatVND } from "@/lib/utils";
+import type { Gift } from "@/types";
 
 export interface SuccessData {
-  transactionId: string
-  customerName: string
-  customerPhone: string
-  invoiceCode: string
-  amount: number
-  pointsEarned: number
-  newTotal: number
-  /** Quà khách vừa đủ điểm đổi (nếu có) */
-  unlockedRewards: Reward[]
-  /** Còn thiếu mấy tick nữa tới mốc kế */
-  nextMilestone: { name: string; diff: number } | null
+  transactionId: string | null;
+  customerName: string;
+  customerPhone: string;
+  invoiceNumber: string | null;
+  amount: number;
+  ticksEarned: number;
+  newTicks: number;
+  /** Quà khách vừa đủ điểm đổi */
+  unlockedGifts: Gift[];
+  /** Mốc kế tiếp còn thiếu mấy tick */
+  nextGift: { name: string; diff: number } | null;
 }
 
 interface Props {
-  data: SuccessData
-  onClose: () => void
-  onRedeem: () => void
-  onUndo: (transactionId: string) => Promise<void>
+  data: SuccessData;
+  onClose: () => void;
+  onRedeem: () => void;
+  onUndo: (transactionId: string) => Promise<void>;
 }
 
 export default function SuccessModal({ data, onClose, onRedeem, onUndo }: Props) {
-  const [undoing, setUndoing] = useState(false)
-  const [secondsLeft, setSecondsLeft] = useState(300) // 5 phút
+  const [undoing, setUndoing] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(300);
 
   useEffect(() => {
-    const t = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000)
-    return () => clearInterval(t)
-  }, [])
+    const t = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, []);
 
-  // Rung nhẹ báo thành công
   useEffect(() => {
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate([40, 60, 40])
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate([40, 60, 40]);
     }
-  }, [])
+  }, []);
 
-  const hasUnlocked = data.unlockedRewards.length > 0
+  const hasUnlocked = data.unlockedGifts.length > 0;
 
   async function handleUndo() {
-    if (!confirm('Hủy giao dịch này? Điểm vừa cộng sẽ bị trừ lại.')) return
-    setUndoing(true)
-    await onUndo(data.transactionId)
-    setUndoing(false)
+    if (!data.transactionId) return;
+    if (!confirm("Huỷ giao dịch này? Tick vừa cộng sẽ bị trừ lại.")) return;
+    setUndoing(true);
+    await onUndo(data.transactionId);
+    setUndoing(false);
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-      {/* Nền mờ */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+      <div
+        className="absolute inset-0 bg-black/45 backdrop-blur-sm animate-fade-in"
+        onClick={onClose}
+      />
 
-      {/* Nội dung */}
-      <div className="relative w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-3xl
-                      p-6 pb-8 animate-slide-up max-h-[90dvh] overflow-y-auto">
+      <div
+        className="animate-slide-up relative max-h-[92dvh] w-full overflow-y-auto
+                   rounded-t-[1.75rem] bg-white p-6 pb-8 sm:max-w-sm sm:rounded-[1.75rem]"
+      >
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 p-2 rounded-full text-gray-400 active:bg-gray-100"
+          className="absolute right-4 top-4 rounded-full p-2 text-slate-400 active:bg-slate-100"
           aria-label="Đóng"
         >
-          <X size={20} />
+          ✕
         </button>
 
-        {/* Dấu tick lớn */}
         <div className="flex flex-col items-center text-center">
-          <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center
-                          animate-pop">
-            <div className="w-14 h-14 rounded-full bg-green-600 flex items-center justify-center">
-              <Check size={32} className="text-white" strokeWidth={3} />
+          <div className="animate-pop flex h-20 w-20 items-center justify-center rounded-full bg-brand-100">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-3xl text-white">
+              ✓
             </div>
           </div>
 
-          <h2 className="mt-4 text-xl font-black text-gray-900">Tích điểm thành công</h2>
-
-          <div className="mt-1 text-sm text-gray-500">
+          <h2 className="mt-4 text-xl font-black text-slate-900">
+            Tích tick thành công
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
             {data.customerName} · {data.customerPhone}
+          </p>
+
+          <div className="mt-5 w-full rounded-[1.5rem] border-2 border-brand-100 bg-brand-50 py-4">
+            <div className="text-4xl font-black tabular-nums text-brand-700">
+              +{data.ticksEarned}{" "}
+              <span className="text-xl font-bold">tick</span>
+            </div>
+            <div className="mt-1 text-sm text-slate-600">
+              Tổng cộng:{" "}
+              <b className="tabular-nums text-slate-900">{data.newTicks} tick</b>
+            </div>
           </div>
 
-          {/* Số tick vừa cộng */}
-          <div className="mt-5 w-full bg-green-50 border border-green-200 rounded-2xl py-4">
-            <div className="text-4xl font-black text-green-700 tabular-nums">
-              +{data.pointsEarned} <span className="text-xl font-bold">tick</span>
-            </div>
-            <div className="text-sm text-gray-600 mt-1">
-              Tổng cộng: <strong className="text-gray-900 tabular-nums">{data.newTotal} tick</strong>
-            </div>
-          </div>
-
-          {/* Chi tiết hóa đơn */}
-          <div className="mt-3 w-full flex justify-between text-sm text-gray-500 px-1">
-            <span>HĐ {data.invoiceCode}</span>
+          <div className="mt-3 flex w-full justify-between px-1 text-sm text-slate-500">
+            <span>{data.invoiceNumber ? `HĐ ${data.invoiceNumber}` : "Không có mã HĐ"}</span>
             <span className="tabular-nums">{formatVND(data.amount)}</span>
           </div>
         </div>
 
         {/* Đủ điểm đổi quà */}
         {hasUnlocked && (
-          <div className="mt-5 bg-orange-50 border-2 border-orange-300 rounded-2xl p-4">
-            <div className="flex items-center gap-2 text-orange-800 font-bold">
-              <Gift size={18} />
-              Khách đủ điểm đổi quà!
-            </div>
+          <div className="mt-5 rounded-[1.5rem] border-2 border-carrot-300 bg-carrot-50 p-4">
+            <p className="font-bold text-carrot-800">🎁 Khách đủ tick đổi quà!</p>
             <ul className="mt-2 space-y-1">
-              {data.unlockedRewards.map((r) => (
-                <li key={r.id} className="text-sm text-orange-700 flex justify-between">
-                  <span>• {r.name}</span>
-                  <span className="font-semibold tabular-nums">{r.points_required} tick</span>
+              {data.unlockedGifts.map((g) => (
+                <li
+                  key={g.id}
+                  className="flex justify-between text-sm text-carrot-700"
+                >
+                  <span>• {g.name}</span>
+                  <span className="font-bold tabular-nums">{g.tick_cost} tick</span>
                 </li>
               ))}
             </ul>
-            <button onClick={onRedeem} className="btn-orange mt-3 py-2.5">
-              🎁 Đổi quà ngay
+            <button onClick={onRedeem} className="btn-accent mt-3 w-full">
+              Đổi quà ngay
             </button>
           </div>
         )}
 
         {/* Gần đủ điểm */}
-        {!hasUnlocked && data.nextMilestone && data.nextMilestone.diff <= 2 && (
-          <div className="mt-5 bg-amber-50 border border-amber-300 rounded-2xl p-3.5 text-center">
-            <div className="text-sm text-amber-800">
-              Còn <strong className="text-base">{data.nextMilestone.diff} tick</strong> nữa là đổi được
-            </div>
-            <div className="font-bold text-amber-900 mt-0.5">{data.nextMilestone.name}</div>
-            <div className="text-xs text-amber-600 mt-1.5">
-              Nhắc khách qua Zalo nhé
-            </div>
+        {!hasUnlocked && data.nextGift && data.nextGift.diff <= 2 && (
+          <div className="mt-5 rounded-[1.5rem] border-2 border-sun-200 bg-sun-50 p-3.5 text-center">
+            <p className="text-sm text-sun-800">
+              Còn <b className="text-base">{data.nextGift.diff} tick</b> nữa là đổi được
+            </p>
+            <p className="mt-0.5 font-bold text-sun-900">{data.nextGift.name}</p>
+            <p className="mt-1.5 text-xs text-sun-700">Nhắn Zalo nhắc khách nhé</p>
           </div>
         )}
 
-        {/* Nút chính */}
-        <button onClick={onClose} className="btn-primary mt-5">
+        <button onClick={onClose} className="btn-primary mt-5 w-full">
           Xong
         </button>
 
-        {/* Hủy giao dịch */}
-        {secondsLeft > 0 && (
+        {/* Huỷ giao dịch */}
+        {data.transactionId && secondsLeft > 0 && (
           <button
             onClick={handleUndo}
             disabled={undoing}
-            className="mt-3 w-full flex items-center justify-center gap-1.5 text-sm
-                       text-gray-400 active:text-red-500 disabled:opacity-50 py-1"
+            className="mt-3 w-full py-1 text-sm text-slate-400 active:text-red-500 disabled:opacity-50"
           >
-            <Undo2 size={14} />
             {undoing
-              ? 'Đang hủy...'
-              : `Nhập sai? Hủy giao dịch (${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')})`}
+              ? "Đang huỷ…"
+              : `Nhập sai? Huỷ giao dịch (${Math.floor(secondsLeft / 60)}:${String(
+                  secondsLeft % 60
+                ).padStart(2, "0")})`}
           </button>
         )}
       </div>
     </div>
-  )
+  );
 }

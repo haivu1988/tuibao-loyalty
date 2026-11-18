@@ -1,88 +1,35 @@
-'use client'
-
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { Suspense } from "react";
+import LoginForm from "@/components/LoginForm";
+import Logo from "@/components/Logo";
 
 export default function LoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (error) {
-      setError('Email hoặc mật khẩu không đúng')
-      setLoading(false)
-      return
-    }
-
-    router.push('/')
-    router.refresh()
-  }
-
   return (
-    <div className="min-h-screen bg-green-700 flex flex-col items-center justify-center p-6">
-      {/* Logo */}
-      <div className="mb-8 text-center">
-        <div className="text-white font-black text-4xl tracking-tight">TUIBAO</div>
-        <div className="text-green-200 text-sm mt-1">Hệ thống tích điểm nội bộ</div>
-      </div>
+    <main className="flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="w-full max-w-sm">
+        <div className="mb-7 flex flex-col items-center text-center">
+          <Logo size={88} />
+          <h1 className="mt-3 text-2xl font-black text-brand-700">
+            Trà sữa tích điểm
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Khu vực nhân viên &amp; quản lý 🧋
+          </p>
+        </div>
 
-      {/* Form */}
-      <div className="w-full max-w-sm bg-white rounded-3xl shadow-xl p-6">
-        <h1 className="text-xl font-bold text-gray-900 mb-6 text-center">Đăng nhập</h1>
-
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="label">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="input-field"
-              placeholder="nhanvien@tuibao.vn"
-              required
-              autoComplete="email"
-            />
-          </div>
-
-          <div>
-            <label className="label">Mật khẩu</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="input-field"
-              placeholder="••••••••"
-              required
-              autoComplete="current-password"
-            />
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-              {error}
+        <Suspense
+          fallback={
+            <div className="card text-center text-sm text-slate-400">
+              Đang tải…
             </div>
-          )}
+          }
+        >
+          <LoginForm />
+        </Suspense>
 
-          <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
-          </button>
-        </form>
+        <p className="mt-6 text-center text-xs text-slate-400">
+          © {new Date().getFullYear()} TUIBAO. Nội bộ.
+        </p>
       </div>
-
-      <p className="text-green-200 text-xs mt-6 text-center">
-        Liên hệ quản lý nếu quên mật khẩu
-      </p>
-    </div>
-  )
+    </main>
+  );
 }
