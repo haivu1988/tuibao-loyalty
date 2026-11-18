@@ -1,20 +1,17 @@
-import { createClient } from "@/lib/supabase/server";
-import BranchManager from "@/components/BranchManager";
-import type { Branch } from "@/types";
+import { createClient } from '@/lib/supabase/server'
+import BranchManager from '@/components/BranchManager'
 
-export const dynamic = "force-dynamic";
-
-export default async function AdminBranchesPage() {
-  const supabase = createClient();
+export default async function BranchesPage() {
+  const supabase = await createClient()
   const { data: branches } = await supabase
-    .from("branches")
-    .select("*")
-    .order("name");
+    .from('branches')
+    .select('*')
+    .order('created_at')
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-bold text-slate-900">Chi nhánh</h1>
-      <BranchManager initial={(branches as Branch[]) ?? []} />
+    <div className="pt-2">
+      <h1 className="text-xl font-bold mb-4">Chi nhánh</h1>
+      <BranchManager initialBranches={branches ?? []} />
     </div>
-  );
+  )
 }

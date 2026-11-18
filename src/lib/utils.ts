@@ -1,51 +1,79 @@
-// Quy đổi tick: 20.000đ = 1 tick (phải khớp v_rate trong migration 004)
-export const TICK_RATE = 20000;
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+import type { NearMilestone, Reward } from '@/types'
 
-export function ticksFromAmount(amount: number): number {
-  return Math.floor(Math.max(amount || 0, 0) / TICK_RATE);
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
 }
 
-// Định dạng tiền VND
 export function formatVND(amount: number): string {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(amount || 0);
+  return new Intl.NumberFormat('vi-VN').format(amount) + 'đ'
 }
 
-// Chuẩn hoá số điện thoại: chỉ giữ chữ số
-export function normalizePhone(phone: string): string {
-  return (phone || "").replace(/\D/g, "");
+/** 50000 → "50.000" (dùng cho ô nhập tiền) */
+export function formatThousands(value: string | number): string {
+  const digits = String(value).replace(/\D/g, '')
+  if (!digits) return ''
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
 
-// Kiểm tra SĐT hợp lệ (tối thiểu 8 chữ số)
-export function isValidPhone(phone: string): boolean {
-  return normalizePhone(phone).length >= 8;
+/** "50.000" → 50000 */
+export function parseThousands(value: string): number {
+  const digits = value.replace(/\D/g, '')
+  return digits ? Number(digits) : 0
 }
 
-// Đăng nhập bằng ID: Supabase Auth cần email, nên ta map ID -> email nội bộ.
-// Nếu người dùng vẫn nhập dạng email (có @) thì giữ nguyên để tương thích.
-export const LOGIN_DOMAIN = "tuibao.local";
-
-export function loginIdToEmail(input: string): string {
-  const v = (input || "").trim().toLowerCase();
-  if (!v) return v;
-  if (v.includes("@")) return v;
-  return `${v.replace(/\s+/g, "")}@${LOGIN_DOMAIN}`;
+/** Chỉ giờ phút: "14:32" */
+export function formatTime(dateStr: string): string {
+  return new Intl.DateTimeFormat('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(dateStr))
 }
 
-// Định dạng ngày giờ VN
-export function formatDateTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
+/** Ngày hôm nay theo giờ VN, dạng YYYY-MM-DD */
+export function todayVN(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })
+}
+
+export function formatDate(dateStr: string): string {
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(dateStr))
+}
+
+export function calcPoints(amount: number): number {
+  return Math.floor(amount / 20000)
+}
+
+/** Tìm milestone gần nhất còn thiếu 1-2 tick */
+export function findNearMilestone(
+  currentPoints: number,
+  rewards: Reward[]
+): NearMilestone | null {
+  const sorted = [...rewards]
+    .filter((r) => r.is_active)
+    .sort((a, b) => a.points_required - b.points_required)
+
+  for (const reward of sorted) {
+    if (currentPoints < reward.points_required) {
+      const diff = reward.points_required - currentPoints
+      if (diff <= 2) return { reward, diff }
+      break // milestone tiếp theo còn xa hơn, không cần check
+    }
   }
+  return null
+}
+
+export function formatPhone(phone: string): string {
+  // 0912345678 → 091 234 5678
+  const clean = phone.replace(/\D/g, '')
+  if (clean.length === 10) {
+    return `${clean.slice(0, 3)} ${clean.slice(3, 6)} ${clean.slice(6)}`
+  }
+  return phone
 }

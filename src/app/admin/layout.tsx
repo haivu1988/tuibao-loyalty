@@ -1,40 +1,24 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import Navbar from "@/components/Navbar";
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import AdminNav from '@/components/AdminNav'
 
-export default async function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
   const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, role")
-    .eq("id", user.id)
-    .single();
+    .from('profiles')
+    .select('full_name, role')
+    .eq('id', user.id)
+    .single()
 
-  // Chỉ quản lý mới vào được khu admin
-  if (profile?.role !== "admin") redirect("/staff");
-
-  const links = [
-    { href: "/admin", label: "Tổng quan" },
-    { href: "/admin/staff", label: "Nhân viên" },
-    { href: "/admin/branches", label: "Chi nhánh" },
-    { href: "/admin/gifts", label: "Quà" },
-    { href: "/admin/qr", label: "Mã QR" },
-    { href: "/staff", label: "Màn NV" },
-  ];
+  if (profile?.role !== 'admin') redirect('/staff')
 
   return (
-    <div className="min-h-screen">
-      <Navbar title="TUIBAO · Quản lý" links={links} userName={profile?.full_name} />
-      <main className="mx-auto max-w-5xl px-4 py-5 pb-safe">{children}</main>
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <AdminNav name={profile.full_name} />
+      <main className="flex-1 p-4 max-w-2xl mx-auto w-full pb-24">{children}</main>
     </div>
-  );
+  )
 }

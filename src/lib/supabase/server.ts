@@ -1,11 +1,10 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-type CookieToSet = { name: string; value: string; options: CookieOptions };
+type CookieToSet = { name: string; value: string; options?: CookieOptions }
 
-// Supabase client dùng ở Server Component / Route Handler
-export function createClient() {
-  const cookieStore = cookies();
+export async function createClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,18 +12,26 @@ export function createClient() {
     {
       cookies: {
         getAll() {
-          return cookieStore.getAll();
+          return cookieStore.getAll()
         },
         setAll(cookiesToSet: CookieToSet[]) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Được gọi từ Server Component — có thể bỏ qua nếu đã có middleware refresh session.
-          }
+            )
+          } catch {}
         },
       },
     }
-  );
+  )
+}
+
+/** Dùng service role để tạo tài khoản nhân viên — CHỈ server-side */
+export function createAdminClient() {
+  const { createClient } = require('@supabase/supabase-js')
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
 }

@@ -1,112 +1,154 @@
-import { createClient } from "@/lib/supabase/server";
-import StatCard from "@/components/StatCard";
-import { formatVND, formatDateTime } from "@/lib/utils";
+import Link from 'next/link'
+import { ChevronRight } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
+import { formatVND, formatPhone, formatTime, todayVN } from '@/lib/utils'
 
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic'
 
 export default async function AdminDashboard() {
-  const supabase = createClient();
+  const supabase = await createClient()
+  const today = todayVN()
 
   const [
-    { count: customerCount },
-    { count: giftCount },
-    { count: redemptionCount },
-    { data: tickAgg },
-    { data: recent },
+    { count: totalCustomers },
+    { data: todayTx },
+    { data: topCustomers },
+    { data: recentTransactions },
   ] = await Promise.all([
-    supabase.from("customers").select("*", { count: "exact", head: true }),
-    supabase
-      .from("gifts")
-      .select("*", { count: "exact", head: true })
-      .eq("active", true),
-    supabase.from("redemptions").select("*", { count: "exact", head: true }),
-    supabase.from("customers").select("ticks"),
-    supabase
-      .from("transactions")
-      .select(
-        "id, amount, ticks_earned, invoice_number, created_at, staff:profiles(full_name, role)"
-      )
-      .order("created_at", { ascending: false })
-      .limit(10),
-  ]);
+    supabase.from('customers').select('*', { count: 'exact', head: true }),
 
-  const totalTicks =
-    (tickAgg ?? []).reduce((sum, r: { ticks: number }) => sum + (r.ticks || 0), 0) ?? 0;
+    supabase
+      .from('transactions')
+      .select('amount, points_earned')
+      .eq('invoice_date', today),
+
+    supabase
+      .from('customer_stats')
+      .select('id, phone, full_name, total_points, total_spent')
+      .order('total_spent', { ascending: false })
+      .limit(5),
+
+    supabase
+      .from('transactions')
+      .select('id, invoice_code, amount, points_earned, created_at, customer:customers(phone, full_name), profile:profiles(full_name)')
+      .order('created_at', { ascending: false })
+      .limit(8),
+  ])
+
+  const todayRevenue = (todayTx ?? []).reduce((s, t) => s + t.amount, 0)
+  const todayPoints = (todayTx ?? []).reduce((s, t) => s + t.points_earned, 0)
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-bold text-slate-900">Tổng quan</h1>
+    <div className="space-y-4 pt-2">
+      <h1 className="text-xl font-bold">Tổng quan</h1>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Khách hàng" value={customerCount ?? 0} accent="brand" />
-        <StatCard
-          label="Tổng tick đang lưu"
-          value={totalTicks}
-          accent="blue"
-          hint="Tick chưa đổi"
-        />
-        <StatCard label="Quà đang bán" value={giftCount ?? 0} accent="green" />
-        <StatCard label="Lượt đổi quà" value={redemptionCount ?? 0} accent="slate" />
+      {/* Hôm nay */}
+      <div className="card !p-4 bg-green-700 text-white">
+        <div className="text-green-200 text-xs font-semibold uppercase tracking-wide">
+          Hôm nay
+        </div>
+        <div className="text-3xl font-black mt-1 tabular-nums">
+          {formatVND(todayRevenue)}
+        </div>
+        <div className="flex gap-4 mt-2 text-sm text-green-100 tabular-nums">
+          <span>{todayTx?.length ?? 0} hóa đơn</span>
+          <span>·</span>
+          <span>{todayPoints} tick đã phát</span>
+        </div>
       </div>
 
-      <div className="card">
-        <h2 className="mb-3 text-sm font-bold text-slate-900">
-          Giao dịch tích điểm gần đây
-        </h2>
-        {recent && recent.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-400">
-                  <th className="pb-2 font-medium">Thời gian</th>
-                  <th className="pb-2 font-medium">Người tích</th>
-                  <th className="pb-2 font-medium">Hoá đơn</th>
-                  <th className="pb-2 font-medium">Số tiền</th>
-                  <th className="pb-2 text-right font-medium">Tick</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {recent.map((t) => {
-                  const staff = Array.isArray(t.staff) ? t.staff[0] : t.staff;
-                  return (
-                  <tr key={t.id}>
-                    <td className="whitespace-nowrap py-2 text-slate-600">
-                      {formatDateTime(t.created_at)}
-                    </td>
-                    <td className="py-2">
-                      {staff?.full_name ? (
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="font-medium text-slate-700">
-                            {staff.full_name}
-                          </span>
-                          {staff.role === "admin" && (
-                            <span className="chip bg-purple-100 text-purple-700">
-                              QL
-                            </span>
-                          )}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </td>
-                    <td className="py-2 text-slate-600">{t.invoice_number || "—"}</td>
-                    <td className="whitespace-nowrap py-2 text-slate-600">
-                      {formatVND(t.amount)}
-                    </td>
-                    <td className="py-2 text-right font-semibold text-brand-600">
-                      +{t.ticks_earned}
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      {/* Tổng khách */}
+      <Link href="/admin/customers" className="card !p-4 flex items-center justify-between active:bg-gray-50">
+        <div>
+          <div className="text-2xl font-black text-gray-900 tabular-nums">
+            {totalCustomers ?? 0}
           </div>
-        ) : (
-          <p className="text-sm text-slate-400">Chưa có giao dịch nào.</p>
+          <div className="text-sm text-gray-500">Khách hàng đã đăng ký</div>
+        </div>
+        <ChevronRight size={20} className="text-gray-300" />
+      </Link>
 
+      {/* Top khách hàng */}
+      <div className="card !p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-bold text-gray-900 text-sm">Khách chi nhiều nhất</h2>
+          <Link href="/admin/customers" className="text-xs font-semibold text-green-700">
+            Xem tất cả
+          </Link>
+        </div>
+        {(topCustomers ?? []).length === 0 ? (
+          <p className="text-sm text-gray-400 py-2">Chưa có dữ liệu</p>
+        ) : (
+          <div className="space-y-2.5">
+            {topCustomers!.map((c, i) => (
+              <div key={c.id} className="flex items-center gap-3">
+                <span className="shrink-0 w-6 text-center font-black text-gray-300 tabular-nums">
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold truncate">
+                    {c.full_name ?? 'Chưa có tên'}
+                  </div>
+                  <div className="text-xs text-gray-400 tabular-nums">
+                    {formatPhone(c.phone)}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="font-bold text-sm text-gray-900 tabular-nums">
+                    {formatVND(c.total_spent)}
+                  </div>
+                  <div className="text-xs text-green-700 font-semibold tabular-nums">
+                    {c.total_points} tick
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Giao dịch gần đây */}
+      <div className="card !p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-bold text-gray-900 text-sm">Giao dịch gần đây</h2>
+          <Link href="/admin/transactions" className="text-xs font-semibold text-green-700">
+            Xem tất cả
+          </Link>
+        </div>
+        {(recentTransactions ?? []).length === 0 ? (
+          <p className="text-sm text-gray-400 py-2">Chưa có giao dịch</p>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {recentTransactions!.map((t) => (
+              <div key={t.id} className="flex justify-between items-start py-2.5">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold truncate">
+                    {/* @ts-expect-error supabase join */}
+                    {t.customer?.full_name ?? 'Chưa có tên'}
+                  </div>
+                  <div className="text-xs text-gray-400 tabular-nums">
+                    {/* @ts-expect-error supabase join */}
+                    {t.customer ? formatPhone(t.customer.phone) : '—'}
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    HĐ {t.invoice_code} · {formatTime(t.created_at)}
+                    {/* @ts-expect-error supabase join */}
+                    {t.profile?.full_name && ` · ${t.profile.full_name}`}
+                  </div>
+                </div>
+                <div className="text-right shrink-0 ml-2">
+                  <div className="text-green-700 font-bold text-sm tabular-nums">
+                    +{t.points_earned}
+                  </div>
+                  <div className="text-xs text-gray-400 tabular-nums">
+                    {formatVND(t.amount)}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
-  );
+  )
 }
