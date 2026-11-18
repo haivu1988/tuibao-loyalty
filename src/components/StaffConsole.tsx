@@ -118,7 +118,7 @@ export default function StaffConsole({ gifts, todayList, zaloAlerts }: Props) {
   return (
     <div className="space-y-3">
       {/* ── Ô nhập SĐT ── */}
-      <form onSubmit={handleSearch} className="card !p-4">
+      <form onSubmit={handleSearch} className="card-hero">
         <label className="label" htmlFor="phone">
           Số điện thoại khách
         </label>
@@ -128,7 +128,7 @@ export default function StaffConsole({ gifts, todayList, zaloAlerts }: Props) {
             id="phone"
             inputMode="tel"
             autoComplete="off"
-            className="input pr-11 text-lg font-semibold tabular-nums tracking-wide"
+            className="input-xl pr-14"
             placeholder="0912 345 678"
             value={phone}
             onChange={(e) => {
@@ -143,8 +143,9 @@ export default function StaffConsole({ gifts, todayList, zaloAlerts }: Props) {
                 setPhone("");
                 phoneRef.current?.focus();
               }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full
-                         px-2 py-1 text-slate-400 active:bg-slate-100"
+              className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2
+                         items-center justify-center rounded-full bg-slate-100
+                         text-lg text-slate-500 active:bg-slate-200"
               aria-label="Xoá"
             >
               ✕
@@ -153,20 +154,18 @@ export default function StaffConsole({ gifts, todayList, zaloAlerts }: Props) {
         </div>
 
         {error && (
-          <p className="mt-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600">
+          <p className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
             {error}
           </p>
         )}
 
-        {isValidPhone(phone) && (
-          <button
-            type="submit"
-            className="btn-primary mt-3 w-full py-3"
-            disabled={searching}
-          >
-            {searching ? "Đang tìm…" : "Tiếp tục"}
-          </button>
-        )}
+        <button
+          type="submit"
+          className="btn-primary btn-xl mt-4"
+          disabled={searching || !isValidPhone(phone)}
+        >
+          {searching ? "Đang tìm…" : "Tiếp tục →"}
+        </button>
       </form>
 
       {/* ── Phần dưới: thu gọn khi đang gõ ── */}
@@ -177,33 +176,40 @@ export default function StaffConsole({ gifts, todayList, zaloAlerts }: Props) {
       >
         {/* Nhắc Zalo */}
         {zaloAlerts.length > 0 && (
-          <div className="card !p-4 !border-sun-200 !bg-sun-50/70">
-            <h2 className="mb-2.5 text-sm font-bold text-sun-900">
-              📱 Nhắc Zalo ({zaloAlerts.length})
+          <div className="rounded-[1.9rem] border-2 border-sun-300 bg-sun-50 p-4
+                          shadow-[0_16px_34px_-18px_rgba(242,170,6,0.5)]">
+            <h2 className="mb-3 flex items-center gap-2 text-base font-black text-sun-900">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full
+                               bg-sun-300 text-base">💬</span>
+              Sắp đủ quà — nhắn Zalo
+              <span className="ml-auto flex h-7 min-w-[1.75rem] items-center justify-center
+                               rounded-full bg-sun-500 px-2 text-sm font-black text-white">
+                {zaloAlerts.length}
+              </span>
             </h2>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {zaloAlerts.map(({ customer, diff, giftName }) => (
                 <button
                   key={customer.id}
                   onClick={() => openCustomer(customer)}
-                  className="flex w-full items-center justify-between gap-2 rounded-2xl
-                             bg-white px-3.5 py-2.5 text-left active:bg-sun-50"
+                  className="flex w-full items-center gap-3 rounded-2xl bg-white
+                             px-3.5 py-3 text-left shadow-sm active:bg-sun-50"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-slate-800">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center
+                                  rounded-full bg-sun-200 text-lg font-black text-sun-800">
+                    {(customer.full_name || customer.phone).charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-bold text-slate-800">
                       {customer.full_name || "Khách chưa đặt tên"}
                     </p>
-                    <p className="text-xs tabular-nums text-slate-500">
-                      {formatPhone(customer.phone)}
-                    </p>
+                    <p className="truncate text-xs text-slate-500">{giftName}</p>
                   </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-bold text-sun-800">
-                      thiếu {diff} tick
+                  <div className="shrink-0 rounded-full bg-sun-100 px-3 py-1.5 text-center">
+                    <p className="text-lg font-black leading-none tabular-nums text-sun-800">
+                      {diff}
                     </p>
-                    <p className="max-w-[120px] truncate text-[11px] text-slate-500">
-                      {giftName}
-                    </p>
+                    <p className="text-[10px] font-bold text-sun-700">tick nữa</p>
                   </div>
                 </button>
               ))}
@@ -213,43 +219,52 @@ export default function StaffConsole({ gifts, todayList, zaloAlerts }: Props) {
 
         {/* Khách tích hôm nay */}
         <div className="card !p-4">
-          <div className="mb-2.5 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-900">Khách tích hôm nay</h2>
-            <span className="chip bg-brand-100 text-brand-800 tabular-nums">
+          <div className="mb-3 flex items-center gap-2">
+            <h2 className="text-base font-black text-slate-900">Khách tích hôm nay</h2>
+            <span className="ml-auto flex h-7 min-w-[1.75rem] items-center justify-center
+                             rounded-full bg-brand-600 px-2 text-sm font-black text-white
+                             tabular-nums">
               {todayList.length}
             </span>
           </div>
 
           {todayList.length === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-400">
-              Chưa có khách nào tích tick hôm nay
-            </p>
+            <div className="py-10 text-center">
+              <p className="text-4xl">🧋</p>
+              <p className="mt-2 text-sm font-semibold text-slate-400">
+                Chưa có khách nào tích tick hôm nay
+              </p>
+            </div>
           ) : (
-            <div className="divide-y divide-brand-50">
+            <div className="space-y-2">
               {todayList.map(({ customer, lastAmount, lastTicks, lastTime, txCount }) => (
-                <div key={customer.id} className="flex items-center gap-3 py-2.5">
+                <div
+                  key={customer.id}
+                  className="flex items-center gap-2 rounded-2xl bg-brand-50/60 p-2"
+                >
                   <button
                     onClick={() => openCustomer(customer)}
                     className="flex min-w-0 flex-1 items-center gap-3 text-left"
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center
-                                    rounded-full bg-brand-100 font-black text-brand-700">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center
+                                    rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600
+                                    text-lg font-black text-white shadow-sm">
                       {(customer.full_name || customer.phone).charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-slate-800">
+                      <p className="truncate text-base font-bold leading-tight text-slate-800">
                         {customer.full_name || "Chưa có tên"}
                       </p>
-                      <p className="text-xs tabular-nums text-slate-500">
+                      <p className="text-xs font-medium tabular-nums text-slate-500">
                         {formatPhone(customer.phone)} · {formatTime(lastTime)}
                         {txCount > 1 && ` · ${txCount} lần`}
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="text-sm font-black tabular-nums text-brand-700">
+                      <p className="text-xl font-black leading-none tabular-nums text-brand-700">
                         +{lastTicks}
                       </p>
-                      <p className="text-xs tabular-nums text-slate-400">
+                      <p className="mt-0.5 text-xs font-semibold tabular-nums text-slate-400">
                         {formatVND(lastAmount)}
                       </p>
                     </div>
@@ -259,10 +274,13 @@ export default function StaffConsole({ gifts, todayList, zaloAlerts }: Props) {
                     onClick={() =>
                       setQrFor(qrFor === customer.phone ? null : customer.phone)
                     }
-                    className="shrink-0 rounded-full px-2 py-1 text-lg active:bg-slate-100"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center
+                               rounded-xl bg-white text-slate-500 shadow-sm active:bg-slate-100"
                     aria-label="Mã QR"
                   >
-                    ⠿
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm10-2h2v2h-2v-2zm4 0h2v2h-2v-2zm-4 4h2v2h-2v-2zm2 2h2v2h-2v-2zm2-2h2v4h-2v-4z" />
+                    </svg>
                   </button>
                 </div>
               ))}

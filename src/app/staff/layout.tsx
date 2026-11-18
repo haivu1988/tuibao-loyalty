@@ -24,7 +24,7 @@ export default async function StaffLayout({
   return (
     <div className="min-h-screen">
       <Navbar title="TUIBAO · Nhân viên" links={links} userName={profile?.full_name} />
-      <main className="mx-auto max-w-5xl px-4 py-5 pb-safe">{children}</main>
+      <main className="mx-auto max-w-5xl px-3.5 py-4 pb-safe">{children}</main>
     </div>
   );
 }

@@ -53,7 +53,14 @@ const config: Config = {
         bubble: "1.75rem",
       },
       fontFamily: {
-        display: ["var(--font-display)", "system-ui", "sans-serif"],
+        display: [
+          "Be Vietnam Pro",
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Roboto",
+          "sans-serif",
+        ],
       },
       boxShadow: {
         bubble: "0 10px 30px -12px rgba(61, 138, 36, 0.35)",

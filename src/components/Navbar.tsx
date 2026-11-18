@@ -18,16 +18,14 @@ export default function Navbar({
 }) {
   return (
     <header className="sticky top-0 z-20 border-b border-brand-100 bg-white/85 backdrop-blur">
-      <div className="mx-auto max-w-5xl px-3 py-2">
+      <div className="mx-auto max-w-5xl px-3 py-1.5">
         <div className="flex items-center justify-between gap-2">
-          <Link href="/" className="flex min-w-0 items-center gap-2.5">
-            <Logo size={38} />
+          <Link href="/" className="flex min-w-0 items-center gap-2">
+            <Logo size={34} />
             <div className="min-w-0 leading-tight">
               <p className="truncate text-sm font-black text-brand-700">{title}</p>
               {userName && (
-                <p className="truncate text-xs text-slate-400">
-                  Xin chào, {userName} 🧋
-                </p>
+                <p className="truncate text-[11px] text-slate-400">{userName}</p>
               )}
             </div>
           </Link>

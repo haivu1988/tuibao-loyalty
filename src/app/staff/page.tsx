@@ -81,19 +81,19 @@ export default async function StaffPage() {
 
   return (
     <div>
-      <div className="mb-4">
-        <h1 className="text-xl font-bold text-slate-900">Tích tick & đổi quà</h1>
-        {myBranch ? (
-          <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-50
-                        px-3 py-1 text-xs font-bold text-brand-700">
-            📍 {myBranch}
-          </p>
-        ) : (
-          <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-amber-50
-                        px-3 py-1 text-xs font-bold text-amber-800">
-            📍 Chưa gán chi nhánh
-          </p>
-        )}
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h1 className="text-2xl font-black tracking-tight text-slate-900">
+          Tích tick
+        </h1>
+        <span
+          className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-black ${
+            myBranch
+              ? "bg-brand-100 text-brand-800"
+              : "bg-amber-100 text-amber-800"
+          }`}
+        >
+          📍 {myBranch ?? "Chưa gán chi nhánh"}
+        </span>
       </div>
 
       <StaffConsole

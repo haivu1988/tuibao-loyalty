@@ -275,34 +275,36 @@ export default function CustomerSheet({
         ) : (
           <>
             {/* ── Tab ── */}
-            <div className="flex shrink-0 gap-1 border-b border-brand-100 px-3 pt-2">
-              <button
-                onClick={() => setTab("earn")}
-                className={`flex-1 border-b-2 pb-2.5 pt-1 text-sm font-bold transition ${
-                  tab === "earn"
-                    ? "border-brand-600 text-brand-700"
-                    : "border-transparent text-slate-400"
-                }`}
-              >
-                Tích tick
-              </button>
-              <button
-                onClick={() => setTab("redeem")}
-                className={`relative flex-1 border-b-2 pb-2.5 pt-1 text-sm font-bold transition ${
-                  tab === "redeem"
-                    ? "border-carrot-500 text-carrot-600"
-                    : "border-transparent text-slate-400"
-                }`}
-              >
-                Đổi quà
-                {redeemable.length > 0 && (
-                  <span className="ml-1.5 inline-flex h-5 min-w-[1.25rem] items-center
-                                   justify-center rounded-full bg-carrot-500 px-1
-                                   text-[11px] font-bold text-white">
-                    {redeemable.length}
-                  </span>
-                )}
-              </button>
+            <div className="shrink-0 px-4 pt-3">
+              <div className="flex gap-1.5 rounded-full bg-slate-100 p-1.5">
+                <button
+                  onClick={() => setTab("earn")}
+                  className={`flex-1 rounded-full py-2.5 text-base font-black transition ${
+                    tab === "earn"
+                      ? "bg-white text-brand-700 shadow-md"
+                      : "text-slate-400"
+                  }`}
+                >
+                  Tích tick
+                </button>
+                <button
+                  onClick={() => setTab("redeem")}
+                  className={`flex-1 rounded-full py-2.5 text-base font-black transition ${
+                    tab === "redeem"
+                      ? "bg-white text-carrot-600 shadow-md"
+                      : "text-slate-400"
+                  }`}
+                >
+                  Đổi quà
+                  {redeemable.length > 0 && (
+                    <span className="ml-1.5 inline-flex h-5 min-w-[1.25rem] items-center
+                                     justify-center rounded-full bg-carrot-500 px-1
+                                     text-[11px] font-black text-white">
+                      {redeemable.length}
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto overscroll-contain p-5 pb-7">
@@ -312,12 +314,14 @@ export default function CustomerSheet({
                   <div>
                     <label className="label" htmlFor="invoice">
                       Số hoá đơn{" "}
-                      <span className="font-normal text-slate-400">(tuỳ chọn)</span>
+                      <span className="font-medium normal-case tracking-normal text-slate-400">
+                        (tuỳ chọn)
+                      </span>
                     </label>
                     <input
                       ref={invoiceRef}
                       id="invoice"
-                      className="input text-lg font-semibold tracking-wide"
+                      className="input text-xl font-bold tracking-wide"
                       placeholder="HD-00123"
                       autoComplete="off"
                       disabled={saving}
@@ -342,44 +346,45 @@ export default function CustomerSheet({
                       }}
                       disabled={saving}
                     />
-                    <div className="mt-2">
+                    <div className="mt-2.5">
                       <QuickAmounts onPick={setAmount} disabled={saving} />
                     </div>
                   </div>
 
                   {/* Xem trước */}
                   <div
-                    className={`rounded-[1.5rem] border-2 py-3 text-center transition ${
+                    className={`rounded-[1.6rem] border-2 py-4 text-center transition ${
                       ticks > 0
-                        ? "border-brand-200 bg-brand-50"
-                        : "border-slate-100 bg-slate-50"
+                        ? "border-brand-300 bg-gradient-to-b from-brand-50 to-brand-100"
+                        : "border-dashed border-slate-200 bg-slate-50"
                     }`}
                   >
                     {ticks > 0 ? (
                       <>
-                        <div className="text-3xl font-black tabular-nums text-brand-700">
-                          +{ticks} tick
+                        <div className="text-5xl font-black leading-none tabular-nums text-brand-700">
+                          +{ticks}
+                          <span className="ml-1 text-2xl">tick</span>
                         </div>
-                        <div className="mt-0.5 text-xs tabular-nums text-slate-500">
+                        <div className="mt-2 text-sm font-semibold tabular-nums text-brand-800/70">
                           {formatVND(amount)} → tổng {customer.ticks + ticks} tick
                         </div>
                       </>
                     ) : (
-                      <p className="py-1 text-sm text-slate-400">
+                      <p className="py-2 text-sm font-semibold text-slate-400">
                         Mỗi {formatThousands(TICK_RATE)}đ = 1 tick
                       </p>
                     )}
                   </div>
 
                   {error && (
-                    <p className="rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-600">
+                    <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
                       {error}
                     </p>
                   )}
 
                   <button
                     type="submit"
-                    className="btn-primary w-full py-3.5 text-base"
+                    className="btn-primary btn-xl"
                     disabled={saving || ticks < 1}
                   >
                     {saving ? "Đang lưu…" : `Tích ${ticks > 0 ? ticks : ""} tick`}

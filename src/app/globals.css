@@ -25,15 +25,21 @@ body {
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-bold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-base font-extrabold transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40;
   }
   /* CTA chính = xanh lá thương hiệu */
   .btn-primary {
-    @apply btn bg-brand-600 text-white shadow-[0_12px_26px_-12px_rgba(48,108,32,0.55)] hover:bg-brand-700;
+    @apply btn bg-gradient-to-b from-brand-500 to-brand-700 text-white
+           shadow-[0_14px_28px_-10px_rgba(48,108,32,0.65)] hover:from-brand-600 hover:to-brand-800;
   }
   /* CTA phụ nổi bật = cam */
   .btn-accent {
-    @apply btn bg-carrot-500 text-white shadow-sm hover:bg-carrot-600;
+    @apply btn bg-gradient-to-b from-carrot-400 to-carrot-600 text-white
+           shadow-[0_14px_28px_-10px_rgba(224,60,15,0.6)] hover:from-carrot-500 hover:to-carrot-700;
+  }
+  /* Nút lớn cho thao tác chính trên điện thoại */
+  .btn-xl {
+    @apply w-full rounded-[1.4rem] px-6 py-4 text-lg font-black tracking-tight;
   }
   .btn-secondary {
     @apply btn border-2 border-brand-200 bg-white text-brand-700 hover:bg-brand-50;
@@ -46,13 +52,22 @@ body {
   }
   /* text-base (16px) để iOS không auto-zoom khi focus input trên điện thoại */
   .input {
-    @apply w-full rounded-2xl border-2 border-brand-100 bg-white px-4 py-2.5 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-400 focus:ring-4 focus:ring-brand-100;
+    @apply w-full rounded-2xl border-2 border-brand-100 bg-white px-4 py-3 text-base font-semibold text-slate-900 outline-none transition placeholder:font-normal placeholder:text-slate-300 focus:border-brand-400 focus:ring-4 focus:ring-brand-100;
+  }
+  /* Ô nhập cỡ lớn — số điện thoại, số tiền */
+  .input-xl {
+    @apply input rounded-[1.4rem] py-4 text-3xl font-black tabular-nums tracking-tight;
   }
   .label {
-    @apply mb-1.5 block text-sm font-semibold text-brand-800;
+    @apply mb-2 block text-sm font-bold uppercase tracking-wide text-brand-700;
   }
   .card {
-    @apply rounded-[1.75rem] border border-brand-100 bg-white/90 p-5 shadow-[0_12px_30px_-14px_rgba(48,108,32,0.3)] backdrop-blur;
+    @apply rounded-[1.75rem] border border-brand-100 bg-white/95 p-5 shadow-[0_12px_30px_-14px_rgba(48,108,32,0.3)] backdrop-blur;
+  }
+  /* Thẻ nổi bật hơn cho khối chính */
+  .card-hero {
+    @apply rounded-[1.9rem] border-2 border-brand-200 bg-white p-5
+           shadow-[0_20px_44px_-18px_rgba(48,108,32,0.45)];
   }
   .chip {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold;

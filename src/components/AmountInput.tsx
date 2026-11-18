@@ -30,9 +30,10 @@ export default function AmountInput({
         disabled={disabled}
         autoFocus={autoFocus}
         placeholder="50.000"
-        className="input pr-11 text-right text-2xl font-extrabold tabular-nums tracking-tight"
+        className="input-xl pr-14 text-right text-4xl"
       />
-      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-400">
+      <span className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2
+                       text-2xl font-black text-brand-400">
         đ
       </span>
     </div>
@@ -56,8 +57,9 @@ export function QuickAmounts({
           type="button"
           disabled={disabled}
           onClick={() => onPick(p)}
-          className="shrink-0 rounded-full bg-brand-50 px-3 py-1.5 text-sm font-bold
-                     tabular-nums text-brand-700 active:bg-brand-100 disabled:opacity-40"
+          className="shrink-0 rounded-2xl border-2 border-brand-100 bg-brand-50 px-4 py-2.5
+                     text-base font-black tabular-nums text-brand-700
+                     active:scale-95 active:bg-brand-100 disabled:opacity-40"
         >
           {formatThousands(p)}
         </button>
